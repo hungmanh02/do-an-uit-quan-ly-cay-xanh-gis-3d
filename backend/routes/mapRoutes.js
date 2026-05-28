@@ -71,37 +71,6 @@ router.post("/import-cay-xanh", upload.single("file"), async (req, res) => {
 // 🌲 PHÂN HỆ 1: BẢNG CÂY XANH ĐÔ THỊ (FULL CRUD)
 // ===================================================================
 
-// 1.1 [GET] LẤY DANH SÁCH CÂY XANH (Trả về GeoJSON chuẩn cho ArcGIS 3D)
-router.get("/cay-xanh", async (req, res) => {
-  try {
-    // Sử dụng các hàm không gian của PostGIS để ép cấu trúc thành GeoJSON chuẩn đét
-    const queryText = `
-      SELECT json_build_object(
-        'type', 'FeatureCollection',
-        'features', json_agg(ST_AsGeoJSON(t.*)::json)
-      )
-      FROM (
-        SELECT 
-          "MaCay" AS id, 
-          "LoaiCay" AS "loaiCay", 
-          "TinhTrang" AS "tinhTrang", 
-          "ChieuCao" AS "chieuCao", 
-          "DuongKinhTan" AS "duongKinhTan",
-          "SHAPE" -- 🌟 BẮT BUỘC: Giữ nguyên cột GEOMETRY để ST_AsGeoJSON xử lý tọa độ 3D
-        FROM CAY_XANH
-      ) AS t;
-    `;
-
-    const result = await db.query(queryText);
-
-    // Trả về đối tượng FeatureCollection hoàn chỉnh cho ArcGIS nạp Layer
-    res.status(200).json(result.rows[0].json_build_object);
-  } catch (err) {
-    console.error("🔴 Lỗi xuất GeoJSON cây xanh đô thị:", err.message);
-    res.status(500).json({error: "Lỗi cấu trúc dữ liệu không gian!"});
-  }
-});
-
 // 1.2 [POST] THÊM MỚI CÂY XANH ĐƠN LẺ (Từ Form Quản trị)
 router.post("/cay-xanh", async (req, res) => {
   const {loaiCay, tinhTrang, chieuCao, duongKinhTan, lon, lat} = req.body;
@@ -354,29 +323,134 @@ router.delete("/don-vi/:id", async (req, res) => {
 // ===================================================================
 // 🗺️ LỚP NỀN KHÔNG GIAN BẢO LƯU GỐC (DÀNH CHO KHU VỰC VÀ TUYẾN ĐƯỜNG VỈA HÈ)
 // ===================================================================
+
+// ===================================================================
+// 🗺️ ĐỒNG BỘ TRIỆT ĐỂ: HIỂN THỊ LỚP PHỦ MẶC ĐỊNH KHI VỪA MỞ TRANG
+// ===================================================================
 router.get("/khu-vuc", async (req, res) => {
   try {
-    const query = `
-      SELECT json_build_object('type', 'FeatureCollection','features', COALESCE(json_agg(ST_AsGeoJSON(t.*)::json), '[]'::json)) as geojson
-      FROM (SELECT "MaKhuVuc" AS id, "TenKhuVuc" AS "tenKhuVuc", "DonViPhuTrach" AS "donViPhuTrach", "SHAPE" AS geom FROM KHU_VUC_QUAN_LY) t;
+    const {maKhuVuc} = req.query;
+    let queryText = "";
+    const params = [];
+
+    if (maKhuVuc) {
+      // TRƯỜNG HỢP 1: Người dùng chọn 1 phân khu đơn lẻ (Giữ nguyên logic cũ của Mạnh)
+      queryText = `
+        SELECT "id" AS id, "TenKhuVuc", "DienTich", "NguoiTuanTra",
+               ST_AsGeoJSON("SHAPE")::json as geometry_osm 
+        FROM "KHU_VUC_QUAN_LY"
+        WHERE "id" = $1
+      `;
+      params.push(parseInt(maKhuVuc));
+
+      const result = await db.query(queryText, params);
+      const geojson = {
+        type: "FeatureCollection",
+        features: result.rows.map((row) => ({
+          type: "Feature",
+          id: row.id,
+          properties: {id: row.id, TenKhuVuc: row.TenKhuVuc, dienTich: row.DienTich, nguoiTuanTra: row.NguoiTuanTra},
+          geometry: row.geometry_osm,
+        })),
+      };
+      return res.json(geojson);
+    } else {
+      // TRƯỜNG HỢP 2: Mặc định lúc đầu không truyền mã (Xem tất cả)
+      // 🌟 Dùng hàm ST_Collect của PostGIS để gộp các Polygon rời rạc thành một khối MultiPolygon chuẩn đét
+      queryText = `
+        SELECT "id" AS id, "TenKhuVuc", "DienTich", "NguoiTuanTra",
+               ST_AsGeoJSON("SHAPE")::json as geometry_osm
+        FROM "KHU_VUC_QUAN_LY"
+      `;
+
+      const result = await db.query(queryText);
+      const geojson = {
+        type: "FeatureCollection",
+        features: result.rows.map((row) => ({
+          type: "Feature",
+          id: row.id,
+          properties: {id: row.id, TenKhuVuc: row.TenKhuVuc, dienTich: row.DienTich, nguoiTuanTra: row.NguoiTuanTra},
+          geometry: row.geometry_osm, // Trả về cấu trúc phân mảnh sạch sẽ cho ArcGIS tự bóc tách
+        })),
+      };
+      return res.json(geojson);
+    }
+  } catch (error) {
+    console.error("🔴 Lỗi API /khu-vuc:", error.message);
+    res.status(500).json({error: "Lỗi hệ thống lớp nền"});
+  }
+});
+// 🚀 LẤY TUYẾN ĐƯỜNG THEO MÃ KHU VỰC ĐƯỢC CHỌN
+router.get("/tuyen-duong", async (req, res) => {
+  try {
+    const {maKhuVuc} = req.query; // Nhận biến lọc ?maKhuVuc=2 từ Frontend
+
+    let queryText = `
+      SELECT "id", "TenDuong", "ChieuDai", ST_AsGeoJSON("SHAPE")::json as geometry 
+      FROM "TUYEN_DUONG"
     `;
-    const result = await db.query(query);
-    res.json(result.rows[0].geojson);
-  } catch (err) {
-    res.status(500).json({error: err.message});
+    const params = [];
+
+    // Nếu Frontend có truyền mã khu vực, tiến hành lọc không gian
+    if (maKhuVuc) {
+      queryText += ` WHERE "MaKhuVuc" = $1`;
+      params.push(parseInt(maKhuVuc));
+    }
+
+    const result = await db.query(queryText, params);
+    const geojson = {
+      type: "FeatureCollection",
+      features: result.rows.map((row) => ({
+        type: "Feature",
+        properties: {id: row.id, tenDuong: row.TenDuong, chieuDai: row.ChieuDai},
+        geometry: row.geometry,
+      })),
+    };
+    res.json(geojson);
+  } catch (error) {
+    res.status(500).json({error: "Lỗi lọc tuyến đường"});
   }
 });
 
-router.get("/tuyen-duong", async (req, res) => {
+// 🚀 LẤY CÂY XANH THEO TUYẾN ĐƯỜNG THUỘC KHU VỰC
+router.get("/cay-xanh", async (req, res) => {
   try {
-    const query = `
-      SELECT json_build_object('type', 'FeatureCollection','features', COALESCE(json_agg(ST_AsGeoJSON(t.*)::json), '[]'::json)) as geojson
-      FROM (SELECT "MaTuyenDuong" AS id, "TenDuong" AS "tenDuong", "LoaiDuong" AS "loaiDuong", "SHAPE" AS geom FROM TUYEN_DUONG) t;
+    const {maKhuVuc} = req.query;
+
+    let queryText = `
+      SELECT c."id", c."LoaiCay", c."ChieuCao", c."DuongKinhTan", c."TinhTrang",
+             ST_AsGeoJSON(c."SHAPE")::json as geometry
+      FROM "CAY_XANH" c
     `;
-    const result = await db.query(query);
-    res.json(result.rows[0].geojson);
-  } catch (err) {
-    res.status(500).json({error: err.message});
+    const params = [];
+
+    if (maKhuVuc) {
+      // Dùng câu lệnh JOIN để lọc các cây thuộc tuyến đường nằm trong khu vực quản lý
+      queryText += ` 
+        INNER JOIN "TUYEN_DUONG" t ON c."MaTuyenDuong" = t."id"
+        WHERE t."MaKhuVuc" = $1
+      `;
+      params.push(parseInt(maKhuVuc));
+    }
+
+    const result = await db.query(queryText, params);
+    const geojson = {
+      type: "FeatureCollection",
+      features: result.rows.map((row) => ({
+        type: "Feature",
+        properties: {
+          id: row.id,
+          loaiCay: row.LoaiCay,
+          tinhTrang: row.TinhTrang,
+          chieuCao: row.ChieuCao,
+          duongKinhTan: row.DuongKinhTan,
+        },
+        geometry: row.geometry,
+      })),
+    };
+    res.json(geojson);
+  } catch (error) {
+    res.status(500).json({error: "Lỗi lọc cây xanh"});
   }
 });
 

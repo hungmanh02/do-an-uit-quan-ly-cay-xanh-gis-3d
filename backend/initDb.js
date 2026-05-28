@@ -1,167 +1,155 @@
-// backend/initDb.js
-const db = require("./config/db");
+const {Pool} = require("pg");
+require("dotenv").config();
 
-async function initializeDatabase() {
-  console.log("================================================================");
-  console.log("⏳   BẮT ĐẦU KHỞI TẠO TOÀN BỘ CƠ SỞ DỮ LIỆU KHÔNG GIAN ĐỒ ÁN...  ");
-  console.log("================================================================");
+const pool = new Pool({
+  user: process.env.DB_USER || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  database: process.env.DB_NAME || "gis_3d_cay_xanh",
+  password: process.env.DB_PASSWORD || "admin",
+  port: process.env.DB_PORT || 5432,
+});
 
+const initDatabase = async () => {
+  const client = await pool.connect();
   try {
-    // 1. Kích hoạt tiện ích mở rộng PostGIS không gian (Bắt buộc)
-    console.log("1. Kích hoạt Extension PostGIS không gian...");
-    await db.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
+    console.log("🚀 Bắt đầu nạp hệ thống dữ liệu thực tế đa phân khu Quận 1...");
 
-    // 2. Dọn dẹp sạch sẽ cấu trúc cũ trước khi tạo mới để tránh lỗi xung đột hệ thống
-    console.log("2. Dọn dẹp các cấu trúc bảng cũ trong hệ thống...");
-    await db.query(`DROP TABLE IF EXISTS NGUOI_DUNG CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS SU_CO CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS NHAT_KY_CHAM_SOC CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS CAY_XANH CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS TUYEN_DUONG CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS KHU_VUC_QUAN_LY CASCADE;`);
-    await db.query(`DROP TABLE IF EXISTS DON_VI_QUAN_LY CASCADE;`);
+    await client.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
 
-    // 3. TẠO BẢNG 1: KHU_VUC_QUAN_LY (Mô hình dữ liệu vùng)
-    console.log("3. Đang khởi tạo bảng 1: KHU_VUC_QUAN_LY (Đa giác)...");
-    await db.query(`
-      CREATE TABLE KHU_VUC_QUAN_LY (
-          "MaKhuVuc" SERIAL PRIMARY KEY,
-          "TenKhuVuc" VARCHAR(100) NOT NULL,
-          "DonViPhuTrach" VARCHAR(100) NOT NULL,
-          "SHAPE" GEOMETRY(Polygon, 4326) 
+    // Dọn sạch dữ liệu cũ để tránh xung đột khóa ngoại và tọa độ
+    await client.query(`
+      DROP TABLE IF EXISTS "SU_CO" CASCADE;
+      DROP TABLE IF EXISTS "NHAT_KY_CHAM_SOC" CASCADE;
+      DROP TABLE IF EXISTS "CAY_XANH" CASCADE;
+      DROP TABLE IF EXISTS "TUYEN_DUONG" CASCADE;
+      DROP TABLE IF EXISTS "KHU_VUC_QUAN_LY" CASCADE;
+    `);
+
+    // Dựng khung cấu trúc chữ hoa có cột "id" tự tăng đồng bộ với App.jsx
+    // Dựng khung cấu trúc chữ hoa chuẩn hệ tọa độ WGS84 (SRID 4326)
+    await client.query(`
+      CREATE TABLE "KHU_VUC_QUAN_LY" (
+        "id" SERIAL PRIMARY KEY,
+        "TenKhuVuc" VARCHAR(255) NOT NULL,
+        "DienTich" FLOAT,
+        "NguoiTuanTra" VARCHAR(100),
+        "SHAPE" geometry(Polygon, 4326)
       );
     `);
 
-    // 4. TẠO BẢNG 2: TUYEN_DUONG (Mô hình mạng lưới vỉa hè)
-    console.log("4. Đang khởi tạo bảng 2: TUYEN_DUONG (Đường)...");
-    await db.query(`
-      CREATE TABLE TUYEN_DUONG (
-          "MaTuyenDuong" SERIAL PRIMARY KEY,
-          "TenDuong" VARCHAR(100) NOT NULL,
-          "LoaiDuong" VARCHAR(50),
-          "MaKhuVuc" INT REFERENCES KHU_VUC_QUAN_LY("MaKhuVuc") ON DELETE SET NULL,
-          "SHAPE" GEOMETRY(LineString, 4326)
+    await client.query(`
+      CREATE TABLE "TUYEN_DUONG" (
+        "id" SERIAL PRIMARY KEY,
+        "MaKhuVuc" INT REFERENCES "KHU_VUC_QUAN_LY"("id") ON DELETE CASCADE,
+        "TenDuong" VARCHAR(255) NOT NULL,
+        "ChieuDai" FLOAT,
+        "SHAPE" geometry(LineString, 4326) -- 🌟 SỬA ĐOẠN NÀY: Thay 'Polyline' bằng 'LineString' viết hoa chữ L và S
       );
     `);
 
-    // 5. TẠO BẢNG 3: CAY_XANH (Thực thể Điểm 3D lập thể)
-    console.log("5. Đang khởi tạo bảng 3: CAY_XANH (Điểm 3D)...");
-    await db.query(`
-      CREATE TABLE CAY_XANH (
-          "MaCay" SERIAL PRIMARY KEY,
-          "LoaiCay" VARCHAR(50) NOT NULL,
-          "TinhTrang" VARCHAR(30) NOT NULL,
-          "ChieuCao" FLOAT NOT NULL,      
-          "DuongKinhTan" FLOAT NOT NULL,  
-          "NgayTrong" DATE DEFAULT CURRENT_DATE, 
-          "MaTuyenDuong" INT REFERENCES TUYEN_DUONG("MaTuyenDuong") ON DELETE SET NULL, 
-          "SHAPE" GEOMETRY(Point, 4326)    
+    await client.query(`
+      CREATE TABLE "CAY_XANH" (
+        "id" SERIAL PRIMARY KEY,
+        "MaTuyenDuong" INT REFERENCES "TUYEN_DUONG"("id") ON DELETE SET NULL,
+        "LoaiCay" VARCHAR(255) NOT NULL,
+        "DuongKinhTan" FLOAT,
+        "ChieuCao" FLOAT,
+        "TinhTrang" VARCHAR(100),
+        "lon" FLOAT,
+        "lat" FLOAT,
+        "SHAPE" geometry(Point, 4326)
       );
     `);
 
-    // 6. TẠO BẢNG 4: NHAT_KY_CHAM_SOC (Temporal Log quản lý vòng đời)
-    console.log("6. Đang khởi tạo bảng 4: NHAT_KY_CHAM_SOC (Trục Thời gian)...");
-    await db.query(`
-      CREATE TABLE NHAT_KY_CHAM_SOC (
-          "MaNhatKy" SERIAL PRIMARY KEY,
-          "MaCay" INT REFERENCES CAY_XANH("MaCay") ON DELETE CASCADE, 
-          "NgayThucHien" DATE NOT NULL DEFAULT CURRENT_DATE,
-          "LoaiCongViec" VARCHAR(100) NOT NULL,
-          "GhiChu" TEXT
+    await client.query(`
+      CREATE TABLE "SU_CO" (
+        "id" SERIAL PRIMARY KEY,
+        "MaCay" INT REFERENCES "CAY_XANH"("id") ON DELETE SET NULL,
+        "TieuDe" VARCHAR(255) NOT NULL,
+        "MoTa" TEXT,
+        "TrangThai" VARCHAR(50) DEFAULT 'Chưa xử lý',
+        "lon" FLOAT,
+        "lat" FLOAT,
+        "SHAPE" geometry(Point, 4326)
       );
     `);
 
-    // 7. TẠO BẢNG 5: SU_CO (Phân hệ tương tác thu thập điểm nóng)
-    console.log("7. Đang khởi tạo bảng 5: SU_CO (Phản ánh hiện trường)...");
-    await db.query(`
-      CREATE TABLE SU_CO (
-          "MaSuCo" SERIAL PRIMARY KEY,
-          "TieuDe" VARCHAR(100) NOT NULL,
-          "MoTa" TEXT,
-          "NguoiBaoCao" VARCHAR(50) NOT NULL,
-          "ThoiGian" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          "TrangThai" VARCHAR(30) NOT NULL DEFAULT 'Chưa xử lý',
-          "HinhAnh" VARCHAR(255),
-          "MaCay" INT REFERENCES CAY_XANH("MaCay") ON DELETE SET NULL,
-          "SHAPE" GEOMETRY(Point, 4326)
-      );
+    // ===================================================================
+    // 🗺️ SEED DỮ LIỆU THỰC TẾ LÕI TRUNG TÂM QUẬN 1
+    // ===================================================================
+
+    // PHÂN KHU 1: PHỐ ĐI BỘ NGUYỄN HUỆ
+    await client.query(`
+      INSERT INTO "KHU_VUC_QUAN_LY" ("id", "TenKhuVuc", "DienTich", "NguoiTuanTra", "SHAPE") VALUES
+      (1, 'Phân khu Phố đi bộ Nguyễn Huệ', 45000.0, 'Đỗ Hùng Mạnh', 
+       ST_GeomFromText('POLYGON((106.7011 10.7766, 106.7025 10.7768, 106.7067 10.7720, 106.7054 10.7711, 106.7011 10.7766))', 4326));
     `);
 
-    // 8. TẠO BẢNG MỚI: NGUOI_DUNG (Phân quyền bảo mật Cán bộ / Nhân viên)
-    console.log("8. Đang khởi tạo bảng quản trị: NGUOI_DUNG (Phân quyền hệ thống)...");
-    await db.query(`
-      CREATE TABLE NGUOI_DUNG (
-          "MaNguoiDung" SERIAL PRIMARY KEY,
-          "TaiKhoan" VARCHAR(100) NOT NULL UNIQUE,
-          "MatKhau" VARCHAR(255) NOT NULL,
-          "HoTen" VARCHAR(150) NOT NULL,
-          "SoDienThoai" VARCHAR(20),
-          "VaiTro" VARCHAR(50) NOT NULL DEFAULT 'Nhân viên',
-          CONSTRAINT chk_vaitro CHECK ("VaiTro" IN ('Nhân viên', 'Quản trị'))
-      );
+    await client.query(`
+      INSERT INTO "TUYEN_DUONG" ("id", "MaKhuVuc", "TenDuong", "ChieuDai", "SHAPE") VALUES
+      (1, 1, 'Trục chính Nguyễn Huệ', 820.0, 
+       ST_GeomFromText('LINESTRING(106.7012533351664 10.776516025516706, 106.70617787073219 10.771530743137287)', 4326));
     `);
 
-    // 9. NẠP DỮ LIỆU ĐỒNG BỘ MẪU
-    console.log("9. Đang nạp dữ liệu mẫu đồng bộ không gian khớp vùng nhìn Maps...");
-
-    // 9.1 Vùng quản lý mẫu Quận 10
-    await db.query(`
-      INSERT INTO KHU_VUC_QUAN_LY ("TenKhuVuc", "DonViPhuTrach", "SHAPE") 
-      VALUES (
-        'Khu vực quản lý Quận 10', 
-        'Công ty TNHH MTV Công viên Cây xanh TP.HCM', 
-        ST_SetSRID(ST_MakePolygon(ST_GeomFromText('LINESTRING(106.660000 10.760000, 106.670000 10.760000, 106.670000 10.768000, 106.660000 10.768000, 106.660000 10.760000)')), 4326)
-      );
+    await client.query(`
+      INSERT INTO "CAY_XANH" ("id", "MaTuyenDuong", "LoaiCay", "DuongKinhTan", "ChieuCao", "TinhTrang", "lon", "lat", "SHAPE") VALUES
+      (10, 1, 'Cây Giáng Hương #1', 6.5, 18.0, 'Khỏe mạnh', 106.70221, 10.77552, ST_SetSRID(ST_MakePoint(106.70221, 10.77552), 4326)),
+      (11, 1, 'Cây Sao Đen #2', 7.0, 22.5, 'Cần chăm sóc', 106.70385, 10.77388, ST_SetSRID(ST_MakePoint(106.70385, 10.77388), 4326)),
+      (12, 1, 'Cây Dầu Rái #3', 5.5, 20.0, 'Khỏe mạnh', 106.70542, 10.77231, ST_SetSRID(ST_MakePoint(106.70542, 10.77231), 4326));
     `);
 
-    // 9.2 Tuyến đường mẫu Ngô Quyền
-    await db.query(`
-      INSERT INTO TUYEN_DUONG ("TenDuong", "LoaiDuong", "MaKhuVuc", "SHAPE")
-      VALUES (
-        'Đường Ngô Quyền', 
-        'Đường chính đô thị', 
-        1,
-        ST_SetSRID(ST_MakeLine(ST_MakePoint(106.663000, 10.761000), ST_MakePoint(106.664000, 10.766000)), 4326)
-      );
+    // PHÂN KHU 2: CÔNG VIÊN TAO ĐÀN
+    await client.query(`
+      INSERT INTO "KHU_VUC_QUAN_LY" ("id", "TenKhuVuc", "DienTich", "NguoiTuanTra", "SHAPE") VALUES
+      (2, 'Phân khu Công viên Tao Đàn', 90000.0, 'Nguyễn Văn Cán Bộ', 
+       ST_GeomFromText('POLYGON((106.6895 10.7758, 106.6936 10.7780, 106.6957 10.7745, 106.6915 10.7724, 106.6895 10.7758))', 4326));
     `);
 
-    // 9.3 3 cá thể cây xanh mọc dọc đường Ngô Quyền
-    await db.query(`
-      INSERT INTO CAY_XANH ("LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "MaTuyenDuong", "SHAPE") VALUES
-      ('Cây Sao Đen', 'Khỏe mạnh', 16.5, 5.0, 1, ST_SetSRID(ST_MakePoint(106.663500, 10.763500), 4326)),
-      ('Cây Dầu Rái', 'Cần chăm sóc', 19.0, 6.5, 1, ST_SetSRID(ST_MakePoint(106.663700, 10.764200), 4326)),
-      ('Cây Bằng Lăng', 'Cần chăm sóc', 7.8, 3.5, 1, ST_SetSRID(ST_MakePoint(106.663300, 10.762800), 4326));
+    await client.query(`
+      INSERT INTO "TUYEN_DUONG" ("id", "MaKhuVuc", "TenDuong", "ChieuDai", "SHAPE") VALUES
+      (2, 2, 'Đường Trương Định (Lõi Công Viên)', 410.0, 
+       ST_GeomFromText('LINESTRING(106.6936 10.7780, 106.6915 10.7724)', 4326));
     `);
 
-    // 9.4 🌟 ĐÃ SỬA LỖI: Đồng bộ lịch sử tác nghiệp dùng trường chữ "Mã" viết hoa
-    await db.query(`
-      INSERT INTO NHAT_KY_CHAM_SOC ("MaCay", "LoaiCongViec", "GhiChu") VALUES
-      (1, 'Kiểm tra định kỳ', 'Cây phát triển bình thường, thân gỗ vững chắc.'),
-      (2, 'Cắt tỉa cành khô', 'Đã hạ độ cao chuẩn bị phòng chống mùa bão lũ.');
+    await client.query(`
+      INSERT INTO "CAY_XANH" ("id", "MaTuyenDuong", "LoaiCay", "DuongKinhTan", "ChieuCao", "TinhTrang", "lon", "lat", "SHAPE") VALUES
+      (20, 2, 'Cây Đa Cổ Thụ', 12.0, 28.0, 'Khỏe mạnh', 106.6928, 10.7755, ST_SetSRID(ST_MakePoint(106.6928, 10.7755), 4326)),
+      (21, 2, 'Cây Sao Đen Cổ Thụ', 8.5, 32.0, 'Sâu bệnh', 106.6921, 10.7738, ST_SetSRID(ST_MakePoint(106.6921, 10.7738), 4326));
     `);
 
-    // 9.5 Nạp dữ liệu sự cố khẩn cấp
-    await db.query(`
-      INSERT INTO SU_CO ("TieuDe", "MoTa", "NguoiBaoCao", "TrangThai", "MaCay", "SHAPE") VALUES
-      ('Cây Sao Đen nghiêng nguy hiểm', 'Sau giông lốc gốc cây có dấu hiệu sụt lún lề đường', 'Cán bộ tuần tra Đội 2', 'Chưa xử lý', 1, ST_SetSRID(ST_MakePoint(106.663500, 10.763500), 4326)),
-      ('Cành gãy sà thấp', 'Cành cây che khuất biển hiệu giao thông', 'Người dân phản ánh', 'Chưa xử lý', 2, ST_SetSRID(ST_MakePoint(106.663700, 10.764200), 4326));
+    // PHÂN KHU 3: CÔNG VIÊN 23 THÁNG 9 (KHU B)
+    await client.query(`
+      INSERT INTO "KHU_VUC_QUAN_LY" ("id", "TenKhuVuc", "DienTich", "NguoiTuanTra", "SHAPE") VALUES
+      (3, 'Phân khu Công viên 23 Tháng 9', 55000.0, 'Tổ Tuần Tra Đô Thị', 
+       ST_GeomFromText('POLYGON((106.6908 10.7686, 106.6961 10.7709, 106.6968 10.7697, 106.6914 10.7674, 106.6908 10.7686))', 4326));
     `);
 
-    // 9.6 Nạp tài khoản kiểm thử quyền Quản trị & Nhân viên
-    await db.query(`
-      INSERT INTO NGUOI_DUNG ("TaiKhoan", "MatKhau", "HoTen", "SoDienThoai", "VaiTro") VALUES
-      ('admin_gis', 'admin123@', 'Đỗ Hùng Mạnh', '0901234567', 'Quản trị'),
-      ('nhanvien_01', 'nv123@', 'Nguyễn Văn Bình', '0908888999', 'Nhân viên');
+    await client.query(`
+      INSERT INTO "TUYEN_DUONG" ("id", "MaKhuVuc", "TenDuong", "ChieuDai", "SHAPE") VALUES
+      (3, 3, 'Trục đi bộ nội khu Công viên', 620.0, 
+       ST_GeomFromText('LINESTRING(106.6908 10.7686, 106.6961 10.7709)', 4326));
     `);
 
-    console.log("================================================================");
-    console.log("🟢 THÀNH CÔNG: Đã di cư cấu trúc và nạp không gian đồng bộ 100%!");
-    console.log("================================================================");
-    process.exit(0);
-  } catch (error) {
-    console.error("🔴 Lỗi nghiêm trọng trong quá trình Migration:", error);
-    process.exit(1);
+    await client.query(`
+      INSERT INTO "CAY_XANH" ("id", "MaTuyenDuong", "LoaiCay", "DuongKinhTan", "ChieuCao", "TinhTrang", "lon", "lat", "SHAPE") VALUES
+      (30, 3, 'Cây Bàng Đài Loan', 4.5, 12.0, 'Khỏe mạnh', 106.6925, 10.7692, ST_SetSRID(ST_MakePoint(106.6925, 10.7692), 4326)),
+      (31, 3, 'Cây Phượng Vĩ #31', 7.0, 15.5, 'Khỏe mạnh', 106.6948, 10.7702, ST_SetSRID(ST_MakePoint(106.6948, 10.7702), 4326));
+    `);
+
+    // Gieo một số sự cố mẫu tại các phân khu để test bộ lọc lề phải
+    await client.query(`
+      INSERT INTO "SU_CO" ("MaCay", "TieuDe", "MoTa", "TrangThai", "lon", "lat", "SHAPE") VALUES
+      (11, 'Cây mục rỗng lề Nguyễn Huệ', 'Phát hiện thân cây Sao Đen số 11 nứt gốc sau mưa.', 'Chưa xử lý', 106.70385, 10.77388, ST_SetSRID(ST_MakePoint(106.70385, 10.77388), 4326)),
+      (21, 'Nguy cơ sập cành Tao Đàn', 'Cành cây Sao Đen cổ thụ khô héo, cần xe cẩu cắt tỉa.', 'Đang xử lý', 106.6921, 10.7738, ST_SetSRID(ST_MakePoint(106.6921, 10.7738), 4326));
+    `);
+
+    console.log("🎉 [THÀNH CÔNG] Đã gieo trọn gói hệ thống dữ liệu thực tế 3 phân khu lớn Quận 1!");
+  } catch (err) {
+    console.error("🔴 Thất bại:", err.message);
+  } finally {
+    client.release();
+    await pool.end();
   }
-}
+};
 
-initializeDatabase();
+initDatabase();

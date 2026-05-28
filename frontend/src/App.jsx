@@ -1,4 +1,3 @@
-// frontend/src/App.jsx
 import React, {useState, useEffect, useRef} from "react";
 import Map3D from "./components/Map3D";
 import ExcelImporter from "./components/ExcelImporter";
@@ -20,14 +19,18 @@ function App() {
   const [password, setPassword] = useState("");
 
   // ===================================================================
+  // 🌟 PHÂN HỆ ĐA KHU VỰC QUẢN LÝ (DYNAMIC ZONE FILTER)
+  // ===================================================================
+  const [khuVucId, setKhuVucId] = useState(""); // "" có nghĩa là hiển thị toàn thành phố
+  const [danhSachKhuVuc, setDanhSachKhuVuc] = useState([]);
+  // ===================================================================
   // 🌲 PHÂN HỆ QUẢN TRỊ 1: LỚP BẢN ĐỒ CÂY XANH ĐÔ THỊ (POSTGRESQL)
   // ===================================================================
-  const [isTreeMenuOpen, setIsTreeMenuOpen] = useState(false); // Đóng/mở Submenu lề trái
-  const [showTreeListModal, setShowTreeListModal] = useState(false); // Đóng/mở Đai bảng thuộc tính lớn
-  const [allTrees, setAllTrees] = useState([]); // Lưu danh sách 102 cây từ PostGIS bóc GeoJSON
-  const [selectedTree, setSelectedTree] = useState(null); // Lưu cây đang được nhấp chọn trích xuất Bottom Bar đen
+  const [isTreeMenuOpen, setIsTreeMenuOpen] = useState(false);
+  const [showTreeListModal, setShowTreeListModal] = useState(false);
+  const [allTrees, setAllTrees] = useState([]);
+  const [selectedTree, setSelectedTree] = useState(null);
   const [treeFormData, setTreeFormData] = useState({
-    // Form dữ liệu Thêm/Sửa thuộc tính cây
     id: "",
     loaiCay: "",
     tinhTrang: "Khỏe mạnh",
@@ -40,11 +43,10 @@ function App() {
   // ===================================================================
   // 🚨 PHÂN HỆ QUẢN TRỊ 2: LỚP BẢN ĐỒ SỰ CỐ HIỆN TRƯỜNG (FULL-CRUD)
   // ===================================================================
-  const [isIncidentMenuOpen, setIsIncidentMenuOpen] = useState(false); // Đóng/mở Submenu lề trái
-  const [showIncidentListModal, setShowIncidentListModal] = useState(false); // Đóng/mở Modal Datatable sự cố lớn
-  const [suCoList, setSuCoList] = useState([]); // Lưu danh sách sự cố đồng bộ từ DB lề phải
+  const [isIncidentMenuOpen, setIsIncidentMenuOpen] = useState(false);
+  const [showIncidentListModal, setShowIncidentListModal] = useState(false);
+  const [suCoList, setSuCoList] = useState([]);
   const [incidentFormData, setIncidentFormData] = useState({
-    // Form dữ liệu Thêm/Sửa sự cố của Admin
     id: "",
     tieuDe: "",
     moTa: "",
@@ -53,20 +55,19 @@ function App() {
     lat: "",
   });
 
-  // 🌐 KHỐI TIẾP NHẬN BÁO CÁO SỰ CỐ CÔNG CỘNG (DÀNH CHO NGƯỜI DÂN CLICK MAP)
-  const [publicCoords, setPublicCoords] = useState(null); // Tọa độ click chuột trích xuất gốc thân cây
-  const [tieuDePublic, setTieuDePublic] = useState(""); // Phân loại vụ việc phản ánh
-  const [moTaPublic, setMoTaPublic] = useState(""); // Diễn biến hiện trường chi tiết
-  const [isSubmittingPublic, setIsSubmittingPublic] = useState(false); // Trạng thái chờ loading khi gửi API
+  // 🌐 KHỐI TIẾP NHẬN BÁO CÁO SỰ CỐ CÔNG CỘ PUBLIC (NGƯỜI DÂN CLICK MAP)
+  const [publicCoords, setPublicCoords] = useState(null);
+  const [tieuDePublic, setTieuDePublic] = useState("");
+  const [moTaPublic, setMoTaPublic] = useState("");
+  const [isSubmittingPublic, setIsSubmittingPublic] = useState(false);
 
   // ===================================================================
   // 📅 PHÂN HỆ QUẢN TRỊ 3: SỔ SÁCH NHẬT KÝ CHĂM SÓC LIÊN KẾT
   // ===================================================================
-  const [isDiaryMenuOpen, setIsDiaryMenuOpen] = useState(false); // Đóng/mở Submenu lề trái
-  const [showDiaryListModal, setShowDiaryListModal] = useState(false); // Đóng/mở Modal Datatable nhật ký lớn
-  const [allDiaries, setAllDiaries] = useState([]); // Mảng lưu dữ liệu nhật ký chăm sóc
+  const [isDiaryMenuOpen, setIsDiaryMenuOpen] = useState(false);
+  const [showDiaryListModal, setShowDiaryListModal] = useState(false);
+  const [allDiaries, setAllDiaries] = useState([]);
   const [diaryFormData, setDiaryFormData] = useState({
-    // Form nhập sổ sách nhật ký chăm sóc mới
     id: "",
     cayXanhId: "",
     loaiCongViec: "Tưới nước",
@@ -77,11 +78,10 @@ function App() {
   // ===================================================================
   // 🏢 PHÂN HỆ QUẢN TRỊ 4: DANH BẠ ĐƠN VỊ CÔNG TÁC PHỤ TRÁCH HẠ TẦNG
   // ===================================================================
-  const [isUnitMenuOpen, setIsUnitMenuOpen] = useState(false); // Đóng/mở Submenu lề trái
-  const [showUnitListModal, setShowUnitListModal] = useState(false); // Đóng/mở Modal Datatable doanh nghiệp nhà thầu lớn
-  const [allUnits, setAllUnits] = useState([]); // Mảng lưu danh bạ các công ty mảng xanh đô thị
+  const [isUnitMenuOpen, setIsUnitMenuOpen] = useState(false);
+  const [showUnitListModal, setShowUnitListModal] = useState(false);
+  const [allUnits, setAllUnits] = useState([]);
   const [unitFormData, setUnitFormData] = useState({
-    // Form đăng ký nhà thầu đơn vị quản lý mới
     id: "",
     tenDonVi: "",
     nguoiDaiDien: "",
@@ -92,8 +92,8 @@ function App() {
   // ===================================================================
   // 🛠️ BỘ ĐIỀU PHỐI BIẾN CHUYÊN NGÀNH CHUNG (CRUD CONFIG)
   // ===================================================================
-  const [activeCrudTable, setActiveCrudTable] = useState(""); // Bảng đích tương tác: 'cay_xanh', 'su_co', 'nhat_ky', 'don_vi' hoặc chuỗi rỗng
-  const [crudAction, setCrudAction] = useState("create"); // Kịch bản điều phối form nhập liệu: 'create' hoặc 'update'
+  const [activeCrudTable, setActiveCrudTable] = useState("");
+  const [crudAction, setCrudAction] = useState("create");
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -108,9 +108,13 @@ function App() {
     }
   };
 
+  // 🚀 ĐỒNG BỘ ĐỘNG: Tải danh sách sự cố lề phải tự động co dãn theo phân khu
   const fetchSuCoTuDB = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/map/su-co");
+      const url = khuVucId
+        ? `http://localhost:5000/api/map/su-co?maKhuVuc=${khuVucId}`
+        : "http://localhost:5000/api/map/su-co";
+      const response = await fetch(url);
       if (response.ok) {
         const geojson = await response.json();
         const listFromDB = geojson.features.map((feature) => ({
@@ -125,13 +129,39 @@ function App() {
         setSuCoList(listFromDB);
       }
     } catch (error) {
-      console.error("🔴 Lỗi đồng bộ dữ liệu:", error);
+      console.error("🔴 Lỗi đồng bộ dữ liệu sự cố lề phải:", error);
     }
   };
+  useEffect(() => {
+    const fetchKhuVuc = async () => {
+      try {
+        // Gọi lên API lấy khu vực (Mạnh kiểm tra lại đúng đường dẫn của Backend nhé)
+        const res = await fetch("http://localhost:5000/api/map/khu-vuc");
+        const data = await res.json();
 
+        // Nếu Backend trả thẳng về mảng GeoJSON dạng FeatureCollection
+        if (data && data.features) {
+          const list = data.features.map((f) => ({
+            id: f.properties.id, // Lấy ID phân khu
+            name: f.properties.TenKhuVuc, // Lấy Tên phân khu (hoặc tenKhuVuc tùy cách Backend đặt)
+          }));
+          setDanhSachKhuVuc(list);
+        }
+        // Hoặc nếu Backend có 1 API riêng trả về mảng danh sách thuần túy
+        else if (Array.isArray(data)) {
+          setDanhSachKhuVuc(data);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy danh sách khu vực thực tế từ DB:", err);
+      }
+    };
+
+    fetchKhuVuc();
+  }, []); // Chạy 1 lần duy nhất khi load trang
   useEffect(() => {
     fetchSuCoTuDB();
-  }, []);
+    setSelectedTree(null); // Đóng Bottom bar đen khi đổi khu vực để tránh kẹt cache
+  }, [khuVucId]);
 
   // XỬ LÝ ĐĂNG NHẬP / ĐĂNG XUẤT
   const handleLoginSubmit = (e) => {
@@ -155,33 +185,26 @@ function App() {
     }
   };
 
-  // ===================================================================
-  // 🔨 HÀM THỰC THI CRUD QUẢN TRỊ VIÊN ĐỒNG BỘ POSTGRESQL TỪ MODAL FORM
-  // ===================================================================
+  // 🔨 THỰC THI THAO TÁC CRUD FORM ADMIND ĐỒNG BỘ POSTGRESQL
   const handleAdminCrudSubmit = async (e) => {
     e.preventDefault();
     let url = "";
     let method = crudAction === "create" ? "POST" : "PUT";
     let bodyData = {};
 
-    // 1. Phân hệ Cây Xanh
     if (activeCrudTable === "cay_xanh") {
       url =
         crudAction === "create"
           ? "http://localhost:5000/api/map/cay-xanh"
           : `http://localhost:5000/api/map/cay-xanh/${treeFormData.id}`;
       bodyData = treeFormData;
-    }
-    // 2. Phân hệ Nhật Ký Chăm Sóc
-    else if (activeCrudTable === "nhat_ky") {
+    } else if (activeCrudTable === "nhat_ky") {
       url =
         crudAction === "create"
           ? "http://localhost:5000/api/map/nhat-ky"
           : `http://localhost:5000/api/map/nhat-ky/${diaryFormData.id}`;
       bodyData = diaryFormData;
-    }
-    // 3. Phân hệ Đơn Vị Quản Lý
-    else if (activeCrudTable === "don_vi") {
+    } else if (activeCrudTable === "don_vi") {
       url =
         crudAction === "create"
           ? "http://localhost:5000/api/map/don-vi"
@@ -197,15 +220,32 @@ function App() {
       });
       if (response.ok) {
         alert("🎉 Thao tác cơ sở dữ liệu thành công!");
-        setActiveCrudTable(null); // Đóng form modal nhập liệu
-        fetchSuCoTuDB(); // Tải lại dữ liệu sự cố nếu có
-        if (map3DRef.current) map3DRef.current.refreshLayers(); // Ép map làm mới
+        setActiveCrudTable(null);
+        fetchSuCoTuDB();
+        if (map3DRef.current) map3DRef.current.refreshLayers();
       }
     } catch (err) {
       alert("🔴 Thao tác thất bại do mất kết nối dữ liệu!");
     }
   };
-  // Các hàm điều phối trạng thái lề phải giữ nguyên
+
+  // 🗑️ THAO TÁC ADMIND: Xóa cây xanh trực tiếp từ nút trên thanh Bottom Bar đen
+  const handleAdminDeleteTree = async (treeId) => {
+    if (!window.confirm(`⚠️ Cán bộ có chắc chắn muốn xóa vĩnh viễn cây #${treeId} khỏi PostGIS?`)) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/map/cay-xanh/${treeId}`, {method: "DELETE"});
+      if (response.ok) {
+        alert("🗑️ Hệ thống đã giải phóng và xóa thực thể cây xanh thành công!");
+        setSelectedTree(null);
+        if (map3DRef.current) map3DRef.current.refreshLayers();
+      } else {
+        alert("Thất bại khi thực hiện xóa.");
+      }
+    } catch (error) {
+      alert("Mất kết nối API Backend!");
+    }
+  };
+
   const handleUpdateStatus = async (id, currentStatus) => {
     let nextStatus = "Đang xử lý";
     if (currentStatus === "Chưa xử lý") nextStatus = "Đang xử lý";
@@ -287,7 +327,7 @@ function App() {
       }}
     >
       {/* ===================================================================
-          CỘT TRÁI: DANH MỤC ĐIỀU HÀNH ĐỘNG (PUBLIC VÀ ADMIN)
+          CỘT TRÁI: SIDEBAR ĐIỀU HÀNH CHUYÊN NGÀNH
           =================================================================== */}
       <div
         style={{
@@ -297,8 +337,8 @@ function App() {
           borderRight: "1px solid #334155",
           padding: showLeftSidebar ? "20px" : "70px 10px 20px 10px",
           display: "flex",
-          flexDirection: "column",
           boxSizing: "border-box",
+          flexDirection: "column",
           zIndex: 10,
           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           overflow: "hidden",
@@ -307,49 +347,71 @@ function App() {
       >
         {showLeftSidebar ? (
           <>
-            {/* PHẦN ĐẦU (HEADER) */}
-            <div style={{flexShrink: 0, paddingBottom: "15px", borderBottom: "1px solid #334155"}}>
-              <div
-                style={{
-                  fontSize: "11px",
-                  color: "#34d399",
-                  fontWeight: "bold",
-                  letterSpacing: "1px",
-                  height: "20px",
-                  alignContent: "center",
-                }}
-              >
+            {/* TIÊU ĐỀ SIDEBAR & Ô CHỌN PHÂN KHU ĐỘNG */}
+            <div style={{flexShrink: 0, paddingBottom: "12px", borderBottom: "1px solid #334155"}}>
+              <div style={{fontSize: "10px", color: "#34d399", fontWeight: "bold", letterSpacing: "1px"}}>
                 SỞ TÀI NGUYÊN VÀ MÔ TRƯỜNG TP.HCM
               </div>
-              <h1 style={{fontSize: "17px", color: "#fff", margin: "4px 0", fontWeight: "800"}}>
+              <h1 style={{fontSize: "16px", color: "#fff", margin: "4px 0", fontWeight: "800"}}>
                 {isLoggedIn ? "Trung Tâm Quản Trị CSDL" : "Cổng Thông Tin Công Cộng"}
               </h1>
-              <div style={{fontSize: "12px", color: "#94a3b8", letterSpacing: "1px"}}>
-                {isLoggedIn ? "👨‍💼 Quyền hạn: Tổng cục trưởng" : "Phản Ánh Sự Cố Cây Xanh Đô Thị"}
+
+              {/* Ô CHỌN PHÂN KHU KHÔNG GIAN ĐỘNG - PHÂN CẤP TỪ TP.HCM XUỐNG DỮ LIỆU ĐỘNG DATABASE */}
+              <div style={{marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px"}}>
+                <label style={{fontSize: "11px", color: "#38bdf8", fontWeight: "bold"}}>
+                  🏢 Chọn phân khu không gian:
+                </label>
+                <select
+                  value={khuVucId}
+                  onChange={(e) => setKhuVucId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "6px",
+                    backgroundColor: "#0f172a",
+                    border: "1px solid #334155",
+                    color: "#fff",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  {/* 🌟 SỬA DÒNG NÀY: Mặc định rỗng là ôm trọn góc nhìn toàn bộ TP.HCM từ trên cao */}
+                  <option value="">🌐 Toàn bộ TP.HCM (Xem tổng quan)</option>
+                  {/* Vòng lặp map tự động lấy dữ liệu thực tế từ Database (Nguyễn Huệ, Tao Đàn, 23/9...) */}
+                  {danhSachKhuVuc &&
+                    Array.isArray(danhSachKhuVuc) &&
+                    danhSachKhuVuc.map((kv) => {
+                      // Bỏ qua hoặc gán key mặc định nếu bản ghi bị lỗi ID trống
+                      const optionId = kv.id || kv.MaKhuVuc || Math.random();
+                      return (
+                        <option key={optionId} value={kv.id}>
+                          📍 {kv.name || kv.TenKhuVuc || "Phân khu chưa đặt tên"}
+                        </option>
+                      );
+                    })}
+                </select>
               </div>
             </div>
 
-            {/* PHẦN GIỮA (BODY) - CUỘN THÔNG MINH */}
+            {/* THÂN SIDEBAR - CUỘN TRÒN THÔNG MINH */}
             <div
               style={{
                 flex: 1,
                 overflowY: "auto",
                 display: "flex",
                 flexDirection: "column",
-                gap: "15px",
+                gap: "12px",
                 padding: "10px 4px 10px 0",
               }}
             >
-              {/* 🌟 NẾU LÀ ADMIN: HIỂN THỊ ĐẦY ĐỦ MENU CHỨC NĂNG CHO TỪNG BẢNG TRÊN CSDL */}
               {isLoggedIn ? (
                 <div style={{display: "flex", flexDirection: "column", gap: "10px"}}>
-                  <h4 style={{color: "#38bdf8", fontSize: "11px", margin: "5px 0 2px 0", fontWeight: "bold"}}>
+                  <h4 style={{color: "#38bdf8", fontSize: "11px", margin: "2px 0", fontWeight: "bold"}}>
                     🗂️ DANH MỤC BẢNG DỮ LIỆU CHUYÊN NGÀNH
                   </h4>
 
-                  {/* ===================================================================
-    🌲 MENU CẤP 1: BẢNG CÂY XANH ĐÔ THỊ (ĐÃ KHÓA LOGIC CHỐNG XUNG ĐỘT)
-    =================================================================== */}
+                  {/* 1. SUBMENU BẢNG CÂY XANH */}
                   <div
                     style={{
                       display: "flex",
@@ -360,7 +422,6 @@ function App() {
                       overflow: "hidden",
                     }}
                   >
-                    {/* Thanh tiêu đề chính - Bấm vào để đóng/mở menu con */}
                     <div
                       onClick={() => setIsTreeMenuOpen(!isTreeMenuOpen)}
                       style={{
@@ -369,9 +430,7 @@ function App() {
                         justifyContent: "space-between",
                         alignItems: "center",
                         cursor: "pointer",
-                        userSelect: "none",
                         backgroundColor: isTreeMenuOpen ? "#1e293b" : "transparent",
-                        transition: "background 0.2s",
                       }}
                     >
                       <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
@@ -388,8 +447,6 @@ function App() {
                         ▼
                       </span>
                     </div>
-
-                    {/* 📂 MENU CẤP CON (SUBMENU) */}
                     {isTreeMenuOpen && (
                       <div
                         style={{
@@ -401,65 +458,60 @@ function App() {
                           gap: "6px",
                         }}
                       >
-                        {/* Nút con 1: Thêm mới cây xanh */}
-                        {isLoggedIn && (
-                          <button
-                            onClick={() => {
-                              setCrudAction("create");
-                              setTreeFormData({
-                                id: "",
-                                loaiCay: "",
-                                tinhTrang: "Khỏe mạnh",
-                                chieuCao: "",
-                                duongKinhTan: "",
-                                lon: "",
-                                lat: "",
-                              });
-                              setActiveCrudTable("cay_xanh");
-                            }}
-                            style={{
-                              width: "100%",
-                              padding: "8px 12px",
-                              backgroundColor: "#1e293b",
-                              border: "1px solid #334155",
-                              color: "#10b981",
-                              borderRadius: "6px",
-                              fontSize: "11px",
-                              textAlign: "left",
-                              cursor: "pointer",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            ➕ Thêm mới cây xanh lập thể
-                          </button>
-                        )}
-
-                        {/* Nút con 2: Xem danh sách cây xanh */}
+                        <button
+                          onClick={() => {
+                            setCrudAction("create");
+                            setTreeFormData({
+                              id: "",
+                              loaiCay: "",
+                              tinhTrang: "Khỏe mạnh",
+                              chieuCao: "",
+                              duongKinhTan: "",
+                              lon: "",
+                              lat: "",
+                            });
+                            setActiveCrudTable("cay_xanh");
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            backgroundColor: "#1e293b",
+                            border: "1px solid #334155",
+                            color: "#10b981",
+                            borderRadius: "6px",
+                            fontSize: "11px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          ➕ Thêm mới cây xanh lập thể
+                        </button>
                         <button
                           onClick={async (e) => {
                             e.preventDefault();
-                            e.stopPropagation(); // 🌟 CHỐNG BỊ BẢN ĐỒ NUỐT SỰ KIỆN CLICK
-
+                            e.stopPropagation();
                             try {
-                              const res = await fetch("http://localhost:5000/api/map/cay-xanh");
+                              const url = khuVucId
+                                ? `http://localhost:5000/api/map/cay-xanh?maKhuVuc=${khuVucId}`
+                                : "http://localhost:5000/api/map/cay-xanh";
+                              const res = await fetch(url);
                               if (res.ok) {
                                 const geojson = await res.json();
-
                                 const listTreesFromDB = geojson.features.map((feature) => ({
                                   id: feature.properties.id,
-                                  loaiCay: feature.properties.loaiCay || feature.properties.loai_cay,
+                                  loaiCay: feature.properties.loaiCay,
                                   tinhTrang: feature.properties.tinhTrang || "Khỏe mạnh",
                                   chieuCao: feature.properties.chieuCao || 0,
                                   duongKinhTan: feature.properties.duongKinhTan || 0,
                                   lon: feature.geometry?.coordinates?.[0] || 0,
                                   lat: feature.geometry?.coordinates?.[1] || 0,
                                 }));
-
                                 setAllTrees(listTreesFromDB);
-                                setShowTreeListModal(true); // 🌟 State bật mở kích hoạt
+                                setShowTreeListModal(true);
                               }
                             } catch (err) {
-                              console.error("🔴 Lỗi nạp danh sách cây:", err);
+                              console.error(err);
                             }
                           }}
                           style={{
@@ -481,7 +533,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* 🚨 MENU BẢNG 2: SỰ CỐ HIỆN TRƯỜNG */}
+                  {/* 2. SUBMENU BẢNG SỰ CỐ */}
                   <div
                     style={{
                       display: "flex",
@@ -501,7 +553,6 @@ function App() {
                         alignItems: "center",
                         cursor: "pointer",
                         backgroundColor: isIncidentMenuOpen ? "#1e293b" : "transparent",
-                        transition: "0.2s",
                       }}
                     >
                       <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
@@ -553,7 +604,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* 📅 MENU BẢNG 3: NHẬT KÝ CHĂM SÓC */}
+                  {/* 3. SUBMENU NHẬT KÝ CHĂM SÓC */}
                   <div
                     style={{
                       display: "flex",
@@ -573,7 +624,6 @@ function App() {
                         alignItems: "center",
                         cursor: "pointer",
                         backgroundColor: isDiaryMenuOpen ? "#1e293b" : "transparent",
-                        transition: "0.2s",
                       }}
                     >
                       <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>📅 3. Nhật Ký Chăm Sóc</span>
@@ -658,7 +708,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* 🏢 MENU BẢNG 4: ĐƠN VỊ QUẢN LÝ */}
+                  {/* 4. SUBMENU ĐƠN VỊ QUẢN LÝ */}
                   <div
                     style={{
                       display: "flex",
@@ -678,7 +728,6 @@ function App() {
                         alignItems: "center",
                         cursor: "pointer",
                         backgroundColor: isUnitMenuOpen ? "#1e293b" : "transparent",
-                        transition: "0.2s",
                       }}
                     >
                       <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
@@ -764,11 +813,10 @@ function App() {
                       </div>
                     )}
                   </div>
-                  {/* Bộ nạp Excel hàng loạt tích hợp phía dưới danh mục */}
                   <ExcelImporter onImportSuccess={() => map3DRef.current?.refreshLayers()} />
                 </div>
               ) : (
-                /* NẾU LÀ NGƯỜI DÂN CÔNG CỘNG: Hiện Form phản ánh mặc định */
+                /* NẾU LÀ NGƯỜI DÂN CÔNG CỘNG: Hiện Form phản ánh */
                 <>
                   {!publicCoords ? (
                     <div
@@ -783,7 +831,7 @@ function App() {
                       }}
                     >
                       💡 <b>Quy trình công cộng:</b> Mạnh bấm chọn một cây xanh vỉa hè $\rightarrow$ Thanh màu đen hiện
-                      lên $\rightarrow$ Ấn nút <b>"🚨 Báo sự có cây này"</b> để lấy chuẩn xác tọa độ gốc thân cây vào
+                      lên $\rightarrow$ Ấn nút <b>"🚨 Báo sự cố cây này"</b> để lấy chuẩn xác tọa độ gốc thân cây vào
                       đây điền form nhé!
                     </div>
                   ) : (
@@ -890,9 +938,7 @@ function App() {
                 </>
               )}
 
-              {/* ===================================================================
-    🌿 KHỐI LỚP PHỦ CÂY XANH (CHUẨN PHOM GỐC - ĐẦY ĐỦ 3 THÔNG TIN)
-    =================================================================== */}
+              {/* KHỐI BIỂU ĐỒ LỚP PHỦ THỐNG KÊ (GIỮ NGUYÊN) */}
               <div
                 style={{
                   background: "#0f172a",
@@ -904,7 +950,6 @@ function App() {
                   gap: "10px",
                 }}
               >
-                {/* Trạng thái 1: Khỏe mạnh */}
                 <div>
                   <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
                     🟢 Lớp phủ cây xanh khỏe mạnh: <b>85%</b>
@@ -913,18 +958,14 @@ function App() {
                     <div style={{width: "85%", height: "100%", backgroundColor: "#10b981", borderRadius: "3px"}}></div>
                   </div>
                 </div>
-
-                {/* Trạng thái 2: Cần chăm sóc */}
                 <div>
                   <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
                     🟡 Lớp phủ cây xanh cần chăm sóc: <b>10%</b>
                   </div>
-                  <div style={{width: "10%", height: "5px", backgroundColor: "#334155", borderRadius: "3px"}}>
+                  <div style={{width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px"}}>
                     <div style={{width: "10%", height: "100%", backgroundColor: "#f59e0b", borderRadius: "3px"}}></div>
                   </div>
                 </div>
-
-                {/* Trạng thái 3: Sâu bệnh */}
                 <div>
                   <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
                     🔴 Lớp phủ cây xanh sâu bệnh: <b>5%</b>
@@ -936,7 +977,7 @@ function App() {
               </div>
             </div>
 
-            {/* PHẦN ĐUÔI (FOOTER) - CHỨA ĐÈN BÁO POSTGIS VÀ ĐĂNG NHẬP */}
+            {/* FOOTER SIDEBAR TRÁI */}
             <div
               style={{
                 flexShrink: 0,
@@ -969,7 +1010,6 @@ function App() {
                 ></span>
                 ĐÃ KẾT NỐI HỆ THỐNG POSTGIS
               </div>
-
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}
@@ -1013,6 +1053,7 @@ function App() {
           <div style={{fontSize: "20px"}}>📊</div>
         )}
       </div>
+
       {/* NÚT ĐÓNG/MỞ SIDEBAR TRÁI */}
       <button
         onClick={() => setShowLeftSidebar(!showLeftSidebar)}
@@ -1035,30 +1076,32 @@ function App() {
       >
         {showLeftSidebar ? "◀" : "☰"}
       </button>
-      {/* KHU VỰC TRUNG TÂM: MAP 3D + THANH BOTTOM BAR ĐEN ĐÃ TÍCH HỢP QUYỀN SỬA/XÓA CỦA ADMIN */}
+
+      {/* ===================================================================
+          KHU VỰC TRUNG TÂM: BẢN ĐỒ 3D ARCGIS VÀ THANH BOTTOM BAR ĐEN
+          =================================================================== */}
       <div style={{flex: 1, height: "100vh", position: "relative"}}>
         <Map3D
           ref={map3DRef}
+          currentKhuVucId={khuVucId}
           onSelectTree={setSelectedTree}
           onReportSuccess={fetchSuCoTuDB}
-          onMapClickPublic={(lon, lat) => {
-            if (!isLoggedIn) {
-              setPublicCoords({lon, lat});
+          onMapClickPublic={(coords) => {
+            if (!isLoggedIn && coords) {
+              setPublicCoords({lon: coords.lon, lat: coords.lat});
               setShowLeftSidebar(true);
             }
           }}
         />
 
-        {/* ===================================================================
-    🎯 BẢN CHUẨN NGHIỆM THU: THANH BOTTOM BAR THÔNG TIN CÂY XANH 2 TẦNG NÚT
-    =================================================================== */}
+        {/* THANH BOTTOM BAR ĐEN THÔNG TIN CÂY ĐỒNG BỘ NÚT XÓA */}
         {selectedTree && (
           <div
             style={{
               position: "absolute",
               bottom: "30px",
               left: "20px",
-              right: showRightSidebar ? "200px" : "20px",
+              right: showRightSidebar ? "370px" : "20px",
               zIndex: 1000,
               backgroundColor: "rgba(15, 23, 42, 0.96)",
               border: "1px solid #10b981",
@@ -1068,14 +1111,12 @@ function App() {
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
               transition: "all 0.3s ease-in-out",
               display: "flex",
-              justifyContent: "space-between", // Đẩy kịch 2 đầu
+              justifyContent: "space-between",
               alignItems: "center",
               gap: "40px",
             }}
           >
-            {/* 🌲 KHỐI TRÁI: THÔNG TIN CÂY XANH (NẰM NGANG HOÀN HẢO) */}
             <div style={{display: "flex", alignItems: "center", gap: "28px", flex: 1, minWidth: 0}}>
-              {/* Icon, Tên cây & ID */}
               <div style={{display: "flex", alignItems: "center", gap: "12px", flexShrink: 0}}>
                 <span style={{fontSize: "22px"}}>🌲</span>
                 <div style={{display: "flex", flexDirection: "column", gap: "2px"}}>
@@ -1087,8 +1128,6 @@ function App() {
                   </span>
                 </div>
               </div>
-
-              {/* Thông số kỹ thuật dàn ngang */}
               <div
                 style={{
                   display: "flex",
@@ -1111,30 +1150,24 @@ function App() {
               </div>
             </div>
 
-            {/* 🛠️ KHỐI PHẢI: CỤM NÚT BẤM 2 TẦNG ĐỐI XỨNG & TOẠ ĐỘ */}
             <div style={{display: "flex", alignItems: "center", gap: "16px", flexShrink: 0}}>
-              {/* Khối cấu trúc 2 tầng nút */}
               <div style={{display: "flex", flexDirection: "column", gap: "6px", width: "190px", flexShrink: 0}}>
                 {isLoggedIn ? (
                   <>
-                    {/* TẦNG 1: Báo cáo sự cố rộng 100% */}
                     <button
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (typeof setActiveCrudTable === "function") {
-                          setActiveCrudTable("su_co");
-                          setCrudAction("create");
-                          setIncidentFormData({
-                            id: "",
-                            tieuDe: `Sự cố cây #${selectedTree?.id} (${selectedTree?.loaiCay})`,
-                            moTa: `Ghi nhận tình trạng: ${selectedTree?.tinhTrang}. Cần xử lý gấp.`,
-                            trangThai: "Chưa xử lý",
-                            lon: selectedTree?.lon,
-                            lat: selectedTree?.lat,
-                            maCay: selectedTree?.id,
-                          });
-                        }
+                        setActiveCrudTable("su_co");
+                        setCrudAction("create");
+                        setIncidentFormData({
+                          id: "",
+                          tieuDe: `Sự cố cây #${selectedTree?.id} (${selectedTree?.loaiCay})`,
+                          moTa: `Ghi nhận tình trạng: ${selectedTree?.tinhTrang}. Cần xử lý gấp.`,
+                          trangThai: "Chưa xử lý",
+                          lon: selectedTree?.lon,
+                          lat: selectedTree?.lat,
+                        });
                       }}
                       style={{
                         width: "100%",
@@ -1146,7 +1179,6 @@ function App() {
                         fontSize: "11px",
                         fontWeight: "bold",
                         cursor: "pointer",
-                        whiteSpace: "nowrap",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1155,8 +1187,6 @@ function App() {
                     >
                       ⚠️ Báo cáo sự cố
                     </button>
-
-                    {/* TẦNG 2: Hai nút Sửa và Xóa chia đôi 50/50 */}
                     <div style={{display: "flex", gap: "6px", width: "100%"}}>
                       <button
                         onClick={() => {
@@ -1188,6 +1218,7 @@ function App() {
                         ✏️ Sửa cây
                       </button>
                       <button
+                        onClick={() => handleAdminDeleteTree(selectedTree.id)}
                         style={{
                           flex: 1,
                           backgroundColor: "#e11d48",
@@ -1206,8 +1237,15 @@ function App() {
                     </div>
                   </>
                 ) : (
-                  /* NẾU LÀ NGƯỜI DÂN */
                   <button
+                    onClick={() => {
+                      setPublicCoords({lon: selectedTree.lon, lat: selectedTree.lat});
+                      setTieuDePublic("");
+                      setMoTaPublic(
+                        `Phản ánh sự cố cho cây mã số #${selectedTree.id} (${selectedTree.loaiCay}) vỉa hè.`,
+                      );
+                      setShowLeftSidebar(true);
+                    }}
                     style={{
                       width: "100%",
                       backgroundColor: "#e11d48",
@@ -1225,8 +1263,6 @@ function App() {
                   </button>
                 )}
               </div>
-
-              {/* Tọa độ kịch phải ngăn bằng vách dọc */}
               <div
                 style={{
                   fontSize: "11px",
@@ -1247,6 +1283,7 @@ function App() {
           </div>
         )}
       </div>
+
       {/* NÚT ĐÓNG/MỞ SIDEBAR PHẢI */}
       <button
         onClick={() => setShowRightSidebar(!showRightSidebar)}
@@ -1269,7 +1306,8 @@ function App() {
       >
         {showRightSidebar ? "▶" : "🚨"}
       </button>
-      {/* CỘT PHẢI: TRUNG TÂM TIẾP NHẬN SỰ CỐ ĐÃ ĐƯỢC TÍCH HỢP CHO NGƯỜI DÂN THEO DÕI CÔNG KHAI */}
+
+      {/* CỘT PHẢI: DANH SÁCH TIẾP NHẬN SỰ CỐ KHẨN CẤP */}
       <div
         style={{
           width: showRightSidebar ? "350px" : "0px",
@@ -1361,9 +1399,12 @@ function App() {
           ))}
         </div>
       </div>
+
       {/* ===================================================================
-          🔏 KHỐI 1: POPUP MODAL ĐĂNG NHẬP HỆ THỐNG
+          🔏 HỆ THỐNG CÁC POPUP MODALS (GIỮ NGUYÊN GIAO DIỆN CHUẨN)
           =================================================================== */}
+
+      {/* MODAL 1: ĐĂNG NHẬP */}
       {showLoginModal && (
         <div
           style={{
@@ -1467,9 +1508,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-          🔏 KHỐI 2: MODEL POPUP NHẬP LIỆU THÊM/SỬA CÂY XANH ĐÔ THỊ (CRUD CHUYÊN NGÀNH)
-          =================================================================== */}
+
+      {/* MODAL 2: FORM THÊM/SỬA CÂY */}
       {activeCrudTable === "cay_xanh" && (
         <div
           style={{
@@ -1508,7 +1548,6 @@ function App() {
               🌲{" "}
               {crudAction === "create" ? "Thêm mới thực thể không gian" : `Cập nhật thuộc tính cây #${treeFormData.id}`}
             </h2>
-
             <form
               onSubmit={handleAdminCrudSubmit}
               style={{display: "flex", flexDirection: "column", gap: "10px", fontSize: "11px"}}
@@ -1530,7 +1569,6 @@ function App() {
                   }}
                 />
               </div>
-
               <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px"}}>
                 <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
                   <label style={{color: "#94a3b8"}}>Chiều cao (m):</label>
@@ -1569,7 +1607,6 @@ function App() {
                   />
                 </div>
               </div>
-
               <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
                 <label style={{color: "#94a3b8"}}>Trạng thái sức khỏe sinh trưởng:</label>
                 <select
@@ -1588,7 +1625,6 @@ function App() {
                   <option value="Sâu bệnh">🔴 Sâu bệnh đô thị nguy hiểm</option>
                 </select>
               </div>
-
               <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px"}}>
                 <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
                   <label style={{color: "#94a3b8"}}>Kinh độ (X - Longitude):</label>
@@ -1627,7 +1663,6 @@ function App() {
                   />
                 </div>
               </div>
-
               <div style={{display: "flex", gap: "10px", marginTop: "10px"}}>
                 <button
                   type="button"
@@ -1665,9 +1700,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-    🔏 MODAL DANH SÁCH SỰ CỐ (BẢNG 2)
-    =================================================================== */}
+
+      {/* MODAL 3: XEM DANH SÁCH SỰ CỐ */}
       {showIncidentListModal && (
         <div
           style={{
@@ -1787,9 +1821,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-    🔏 MODAL INPUT FORM NHẬP NHẬT KÝ CHĂM SÓC (BẢNG 3)
-    =================================================================== */}
+
+      {/* MODAL 4: FORM NHẬP NHẬT KÝ */}
       {activeCrudTable === "nhat_ky" && (
         <div
           style={{
@@ -1910,9 +1943,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-    🔏 MODAL INPUT FORM THÊM ĐƠN VỊ QUẢN LÝ (BẢNG 4)
-    =================================================================== */}
+
+      {/* MODAL 5: FORM THÊM ĐƠN VỊ */}
       {activeCrudTable === "don_vi" && (
         <div
           style={{
@@ -2037,9 +2069,8 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-    🔏 MODAL DANH SÁCH CÂY XANH ĐÔ THỊ ĐA CHIỀU (BẢNG THUỘC TÍNH PHÂN HỆ)
-    =================================================================== */}
+
+      {/* MODAL 6: DATATABLE LỚN DANH SÁCH CÂY XANH ĐA CHIỀU */}
       {showTreeListModal && (
         <div
           style={{
@@ -2058,7 +2089,7 @@ function App() {
           <div
             style={{
               background: "#1e293b",
-              border: "1px solid #10b981", // Viền xanh lục emerald đặc trưng
+              border: "1px solid #10b981",
               borderRadius: "16px",
               width: "95%",
               maxWidth: "1100px",
@@ -2071,7 +2102,6 @@ function App() {
               boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
             }}
           >
-            {/* 1. Header của Modal */}
             <div
               style={{
                 display: "flex",
@@ -2081,17 +2111,7 @@ function App() {
                 paddingBottom: "12px",
               }}
             >
-              <h2
-                style={{
-                  fontSize: "15px",
-                  color: "#10b981",
-                  fontWeight: "bold",
-                  margin: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
+              <h2 style={{fontSize: "15px", color: "#10b981", fontWeight: "bold", margin: 0}}>
                 📊 DANH SÁCH THUỘC TÍNH QUẦN THỂ CÂY XANH ĐÔ THỊ ({allTrees.length} thực thể Không gian)
               </h2>
               <button
@@ -2105,16 +2125,11 @@ function App() {
                   cursor: "pointer",
                   fontWeight: "bold",
                   fontSize: "12px",
-                  transition: "0.2s",
                 }}
-                onMouseOver={(e) => (e.currentTarget.style.color = "#fff")}
-                onMouseOut={(e) => (e.currentTarget.style.color = "#94a3b8")}
               >
                 ✕ Đóng giao diện
               </button>
             </div>
-
-            {/* 2. Thân bảng dữ liệu trích xuất thuộc tính hình học */}
             <div style={{flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155"}}>
               <table style={{width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left"}}>
                 <thead>
@@ -2144,17 +2159,12 @@ function App() {
                         colSpan="7"
                         style={{padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center"}}
                       >
-                        📭 Hệ thống đang truy vấn cơ sở dữ liệu GIS hoặc API chưa phản hồi...
+                        📭 Không tìm thấy dữ liệu cây xanh nào tương ứng với phân khu này.
                       </td>
                     </tr>
                   ) : (
                     allTrees.map((tree) => (
-                      <tr
-                        key={tree.id}
-                        style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b", transition: "0.2s"}}
-                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#0f172a")}
-                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#1e293b")}
-                      >
+                      <tr key={tree.id} style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b"}}>
                         <td style={{padding: "12px", fontWeight: "bold", color: "#34d399"}}>#{tree.id}</td>
                         <td style={{padding: "12px", fontWeight: "bold"}}>{tree.loaiCay}</td>
                         <td style={{padding: "12px"}}>{tree.chieuCao} m</td>
@@ -2167,13 +2177,13 @@ function App() {
                               fontSize: "11px",
                               fontWeight: "bold",
                               backgroundColor:
-                                tree.tinhTrang === "Khỏe mạnh" || tree.tinhTrang === "Khỏe Mạnh"
+                                tree.tinhTrang === "Khỏe mạnh"
                                   ? "rgba(16,185,129,0.15)"
                                   : tree.tinhTrang === "Cần chăm sóc"
                                     ? "rgba(245,158,11,0.15)"
                                     : "rgba(239,68,68,0.15)",
                               color:
-                                tree.tinhTrang === "Khỏe mạnh" || tree.tinhTrang === "Khỏe Mạnh"
+                                tree.tinhTrang === "Khỏe mạnh"
                                   ? "#10b981"
                                   : tree.tinhTrang === "Cần chăm sóc"
                                     ? "#f59e0b"
@@ -2184,11 +2194,9 @@ function App() {
                           </span>
                         </td>
                         <td style={{padding: "12px", color: "#38bdf8", fontFamily: "monospace"}}>
-                          {tree.lon ? parseFloat(tree.lon).toFixed(6) : "0.000000"},{" "}
-                          {tree.lat ? parseFloat(tree.lat).toFixed(6) : "0.000000"}
+                          {parseFloat(tree.lon).toFixed(6)}, {parseFloat(tree.lat).toFixed(6)}
                         </td>
                         <td style={{padding: "12px", display: "flex", gap: "8px", justifyContent: "center"}}>
-                          {/* Nút Sửa: Đóng Modal, đổ dữ liệu lên Form Quản trị */}
                           <button
                             onClick={() => {
                               setCrudAction("update");
@@ -2201,7 +2209,7 @@ function App() {
                                 lon: tree.lon,
                                 lat: tree.lat,
                               });
-                              setShowTreeListModal(false); // Đóng bảng để lộ Form bên dưới
+                              setShowTreeListModal(false);
                               setActiveCrudTable("cay_xanh");
                             }}
                             style={{
@@ -2217,29 +2225,17 @@ function App() {
                           >
                             ✏️ Sửa
                           </button>
-
-                          {/* Nút Xóa: Chỉ kích hoạt cho quyền Cán bộ quản trị */}
                           {isLoggedIn && (
                             <button
                               onClick={async () => {
-                                if (
-                                  window.confirm(
-                                    `⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn cây #${tree.id} khỏi hệ thống PostgreSQL?`,
-                                  )
-                                ) {
-                                  try {
-                                    const res = await fetch(`http://localhost:5000/api/map/cay-xanh/${tree.id}`, {
-                                      method: "DELETE",
-                                    });
-                                    if (res.ok) {
-                                      alert("🗑️ Hệ thống GIS đã gỡ bỏ thực thể cây xanh thành công!");
-                                      setAllTrees(allTrees.filter((t) => t.id !== tree.id));
-                                      if (map3DRef.current) map3DRef.current.refreshLayers(); // Đồng bộ tải lại Layer không gian 3D
-                                    } else {
-                                      alert("Xóa thất bại từ phía Server.");
-                                    }
-                                  } catch (err) {
-                                    alert("Lỗi kết nối API xóa cây.");
+                                if (window.confirm(`⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn cây #${tree.id}?`)) {
+                                  const res = await fetch(`http://localhost:5000/api/map/cay-xanh/${tree.id}`, {
+                                    method: "DELETE",
+                                  });
+                                  if (res.ok) {
+                                    alert("🗑️ Đã xóa cây thành công khỏi PostgreSQL!");
+                                    setAllTrees(allTrees.filter((t) => t.id !== tree.id));
+                                    if (map3DRef.current) map3DRef.current.refreshLayers();
                                   }
                                 }
                               }}
@@ -2267,29 +2263,28 @@ function App() {
           </div>
         </div>
       )}
-      {/* ===================================================================
-    🔏 MODAL 3: XEM SỔ SÁCH NHẬT KÝ CHĂM SÓC (Temporal Log Layer)
-    =================================================================== */}
+
+      {/* MODAL 7: DATATABLE LỚN NHẬT KÝ CHĂM SÓC */}
       {showDiaryListModal && (
         <div
           style={{
-            position: "fixed", // 🌟 ÉP BUỘC: Cố định phủ toàn màn hình
+            position: "fixed",
             top: 0,
             left: 0,
             width: "100vw",
             height: "100vh",
-            backgroundColor: "rgba(15, 23, 42, 0.85)", // Phông tối mờ che bản đồ phía sau
+            backgroundColor: "rgba(15, 23, 42, 0.85)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 999999, // 🌟 ÉP BUỘC: Nổi lên trên lớp Canvas 3D của ArcGIS
+            zIndex: 999999,
             padding: "40px",
           }}
         >
           <div
             style={{
               background: "#1e293b",
-              border: "1px solid #38bdf8", // Viền màu xanh cyan đặc trưng cho phân hệ lịch sử thời gian
+              border: "1px solid #38bdf8",
               borderRadius: "16px",
               width: "95%",
               maxWidth: "1000px",
@@ -2302,7 +2297,6 @@ function App() {
               boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
             }}
           >
-            {/* 1. Thanh Tiêu đề Modal */}
             <div
               style={{
                 display: "flex",
@@ -2312,28 +2306,11 @@ function App() {
                 paddingBottom: "12px",
               }}
             >
-              <h2
-                style={{
-                  fontSize: "15px",
-                  color: "#38bdf8",
-                  fontWeight: "bold",
-                  margin: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
-              >
+              <h2 style={{fontSize: "15px", color: "#38bdf8", fontWeight: "bold", margin: 0}}>
                 📅 SỔ TÁC NGHIỆP & LỊCH SỬ CHĂM SÓC CÂY ĐÔ THỊ ({allDiaries?.length || 0} lượt ghi chép)
               </h2>
               <button
-                onClick={() => {
-                  // Kiểm tra xem đang dùng Class Component hay Function Component để đóng
-                  if (typeof setShowDiaryListModal === "function") {
-                    setShowDiaryListModal(false);
-                  } else {
-                    this.setState({showDiaryListModal: false});
-                  }
-                }}
+                onClick={() => setShowDiaryListModal(false)}
                 style={{
                   background: "#334155",
                   border: "none",
@@ -2343,16 +2320,11 @@ function App() {
                   cursor: "pointer",
                   fontWeight: "bold",
                   fontSize: "12px",
-                  transition: "0.2s",
                 }}
-                onMouseOver={(e) => (e.currentTarget.style.color = "#fff")}
-                onMouseOut={(e) => (e.currentTarget.style.color = "#94a3b8")}
               >
                 ✕ Đóng sổ sách
               </button>
             </div>
-
-            {/* 2. Thân bảng dữ liệu cuộn dọc lịch sử */}
             <div style={{flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155"}}>
               <table style={{width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left"}}>
                 <thead>
@@ -2370,32 +2342,26 @@ function App() {
                     <th style={{padding: "12px"}}>Liên kết mã thực thể cây</th>
                     <th style={{padding: "12px"}}>Ngày thực hiện tác vụ</th>
                     <th style={{padding: "12px"}}>Nội dung công việc</th>
-                    <th style={{padding: "12px"}}>Ghi chú kỹ thuật / Hiện trạng</th>
+                    <th style={{padding: "12px"}}>Ghi chú kỹ thuật</th>
                     <th style={{padding: "12px", textAlign: "center"}}>Quản trị dòng</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Bộ bẫy phòng thủ chống sập giao diện khi mảng trống hoặc undefined */}
-                  {!allDiaries || !Array.isArray(allDiaries) || allDiaries.length === 0 ? (
+                  {!allDiaries || allDiaries.length === 0 ? (
                     <tr>
                       <td
                         colSpan="6"
                         style={{padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center"}}
                       >
-                        📭 Không tìm thấy dữ liệu nhật ký chăm sóc nào từ hệ thống PostgreSQL.
+                        📭 Không tìm thấy dữ liệu nhật ký chăm sóc nào.
                       </td>
                     </tr>
                   ) : (
                     allDiaries.map((diary) => (
-                      <tr
-                        key={diary.id}
-                        style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b", transition: "0.2s"}}
-                        onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#0f172a")}
-                        onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#1e293b")}
-                      >
+                      <tr key={diary.id} style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b"}}>
                         <td style={{padding: "12px", fontWeight: "bold", color: "#38bdf8"}}>#{diary.id}</td>
                         <td style={{padding: "12px", fontWeight: "bold", color: "#34d399"}}>
-                          🌲 Thừa hành cây #{diary.cayXanhId}
+                          🌲 Cây #{diary.cayXanhId}
                         </td>
                         <td style={{padding: "12px", fontFamily: "monospace"}}>
                           {diary.ngayThucHien ? new Date(diary.ngayThucHien).toLocaleDateString("vi-VN") : "---"}
@@ -2430,28 +2396,13 @@ function App() {
                         <td style={{padding: "12px", textAlign: "center"}}>
                           <button
                             onClick={async () => {
-                              if (
-                                window.confirm(
-                                  `⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn dòng nhật ký công vụ #${diary.id}?`,
-                                )
-                              ) {
-                                try {
-                                  const res = await fetch(`http://localhost:5000/api/map/nhat-ky/${diary.id}`, {
-                                    method: "DELETE",
-                                  });
-                                  if (res.ok) {
-                                    alert("🗑️ Đã gỡ bỏ dòng nhật ký thành công khỏi CSDL!");
-                                    // Cập nhật lại danh sách trên giao diện lập tức
-                                    if (typeof setAllDiaries === "function") {
-                                      setAllDiaries(allDiaries.filter((d) => d.id !== diary.id));
-                                    } else {
-                                      this.setState({allDiaries: allDiaries.filter((d) => d.id !== diary.id)});
-                                    }
-                                  } else {
-                                    alert("Xóa dòng thất bại.");
-                                  }
-                                } catch (err) {
-                                  alert("Lỗi kết nối API xóa nhật ký.");
+                              if (window.confirm(`⚠️ Xóa dòng nhật ký #${diary.id}?`)) {
+                                const res = await fetch(`http://localhost:5000/api/map/nhat-ky/${diary.id}`, {
+                                  method: "DELETE",
+                                });
+                                if (res.ok) {
+                                  alert("🗑️ Đã xóa dòng!");
+                                  setAllDiaries(allDiaries.filter((d) => d.id !== diary.id));
                                 }
                               }
                             }}

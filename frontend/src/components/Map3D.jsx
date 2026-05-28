@@ -5,8 +5,10 @@ const {loadModules} = esriLoader;
 const Map3D = forwardRef((props, ref) => {
   const mapRef = useRef(null);
 
-  // 🌟 KHẮC PHỤC CHÍNH XÁC: Dùng Ref để quản lý thực thể View thay vì biến window toàn cục
+  // Quản lý các thực thể không gian bằng Ref để tránh rò rỉ bộ nhớ RAM trình duyệt
   const viewRef = useRef(null);
+  const layerKhuVucRef = useRef(null);
+  const layerTuyenDuongRef = useRef(null);
   const treeLayerRef = useRef(null);
   const suCoLayerRef = useRef(null);
 
@@ -16,34 +18,39 @@ const Map3D = forwardRef((props, ref) => {
   // Xuất các hàm điều khiển ra môi trường App.jsx bên ngoài
   useImperativeHandle(ref, () => ({
     refreshLayers() {
+      if (layerKhuVucRef.current && typeof layerKhuVucRef.current.refresh === "function")
+        layerKhuVucRef.current.refresh();
+      if (layerTuyenDuongRef.current && typeof layerTuyenDuongRef.current.refresh === "function")
+        layerTuyenDuongRef.current.refresh();
       if (treeLayerRef.current && typeof treeLayerRef.current.refresh === "function") treeLayerRef.current.refresh();
       if (suCoLayerRef.current && typeof suCoLayerRef.current.refresh === "function") suCoLayerRef.current.refresh();
     },
 
-    // 🌟 HÀM BAY CAMERA CHUẨN ĐỒNG BỘ:
+    // Hàm lướt camera mượt mà đến tọa độ chỉ định khi bấm danh sách sự cố lề phải
     flyToCoordinates(lon, lat) {
       if (viewRef.current) {
         viewRef.current
           .goTo(
             {
               center: [parseFloat(lon), parseFloat(lat)],
-              zoom: 19, // Phóng to cận cảnh khu vực sự cố
-              tilt: 65, // Tạo góc nghiêng 3D để dễ dàng quan sát
+              zoom: 19, // Cận cảnh hiện trường sự cố
+              tilt: 62, // Góc nghiêng lập thể xem khối 3D cây xanh
             },
             {
-              duration: 1800, // Tốc độ lướt camera mượt mà trong 1.8 giây
-              easing: "in-out-cubic", // Hiệu ứng lướt mượt giảm tốc khi đến nơi
+              duration: 1800,
+              easing: "in-out-cubic", // Tốc độ mượt mà giảm tốc khi đến nơi
             },
           )
           .catch((err) => {
-            console.error("Lỗi điều hướng không gian camera:", err);
+            console.error("Lỗi điều hướng camera:", err);
           });
-      } else {
-        console.warn("Thực thể bản đồ 3D chưa sẵn sàng tiếp nhận điều hướng.");
       }
     },
   }));
 
+  // ===================================================================
+  // 🛰️ EFFECT 1: KHỞI TẠO BẢN ĐỒ 3D ARCGIS LẦN ĐẦU TIÊN (LOAD TRANG)
+  // ===================================================================
   useEffect(() => {
     let view;
 
@@ -57,66 +64,77 @@ const Map3D = forwardRef((props, ref) => {
           ground: "world-elevation",
         });
 
+        // 🌟 KHỞI TẠO MẶC ĐỊNH: Camera ở độ cao lớn bao quát toàn bộ TP.HCM
         view = new SceneView({
           container: mapRef.current,
           map: map,
           camera: {
             position: {
-              x: 106.702514, // Kinh độ trung tâm Nguyễn Huệ, Quận 1
-              y: 10.772548, // Vĩ độ Quận 1
-              z: 400, // Độ cao camera cách mặt đất (mét) - 400m để nhìn toàn cảnh lập thể
+              x: 106.66017, // Tọa độ tâm địa lý TP.HCM (Khu vực Quận 10/Quận 3)
+              y: 10.76262,
+              z: 12000, // Độ cao 12.000 mét bao quát toàn thành phố lúc load trang
             },
-            tilt: 45, // Góc nghiêng camera 45 độ để thấy rõ khối 3D ốc đảo cây xanh
+            tilt: 0, // Góc nhìn phẳng từ trên xuống giống 2D chuẩn tổng quan
             heading: 0,
           },
           environment: {
             lighting: {
-              directShadowsEnabled: true,
+              directShadowsEnabled: true, // Kích hoạt bóng đổ thân cây thực tế theo thời gian
               ambientOcclusionEnabled: true,
             },
           },
         });
 
-        // 🌟 GÁN THỰC THỂ VIEW VÀO REF NGAY KHI KHỞI TẠO THÀNH CÔNG
         viewRef.current = view;
+        const timestamp = new Date().getTime();
 
-        // ===================================================================
-        // CÁC LỚP DỮ LIỆU KHÔNG GIAN (Giữ nguyên cấu hình cũ)
-        // ===================================================================
+        // 🟢 TẦNG ĐÁY 1: Lớp ranh giới phân vùng quản lý (Polygon viền hồng nền tối mờ)
+        const rendererKhuVuc = {
+          type: "simple",
+          symbol: {
+            type: "polygon-3d",
+            symbolLayers: [
+              {
+                type: "fill",
+                material: {color: [15, 23, 42, 0.4]}, // Slate-900 độ trong suốt 40%
+                outline: {color: [244, 63, 94, 0.9], size: 2.5}, // Viền hồng Rose-500 dày 2.5px
+              },
+            ],
+          },
+        };
+
         const layerKhuVuc = new GeoJSONLayer({
-          url: "http://localhost:5000/api/map/khu-vuc",
+          url: `http://localhost:5000/api/map/khu-vuc?t=${timestamp}`,
           title: "Ranh giới quản lý hành chính",
+          renderer: rendererKhuVuc,
+          outFields: ["*"],
+        });
+
+        // 🔵 TẦNG GIỮA 2: Lớp mạng lưới tim đường / hành lang vỉa hè kỹ thuật (LineString phẳng lì)
+        const layerTuyenDuong = new GeoJSONLayer({
+          url: `http://localhost:5000/api/map/tuyen-duong?t=${timestamp}`,
+          title: "Mạng lưới giao thông vỉa hè",
+          geometryType: "polyline",
+          outFields: ["*"],
+          elevationInfo: {mode: "on-the-ground"},
           renderer: {
             type: "simple",
             symbol: {
-              type: "polygon-3d",
+              type: "line-3d",
               symbolLayers: [
                 {
-                  type: "fill",
-                  material: {color: [16, 185, 129, 0.04]},
-                  outline: {color: "rgba(16, 185, 129, 0.6)", width: 2},
+                  type: "line",
+                  size: 4.0, // Độ rộng vỉa hè 4 mét
+                  material: {color: "#475569"}, // Tông màu xám đường phố đô thị
                 },
               ],
             },
           },
         });
-        map.add(layerKhuVuc);
 
-        const layerTuyenDuong = new GeoJSONLayer({
-          url: "http://localhost:5000/api/map/tuyen-duong",
-          title: "Mạng lưới giao thông vỉa hè",
-          renderer: {
-            type: "simple",
-            symbol: {
-              type: "line-3d",
-              symbolLayers: [{type: "path", profile: "quad", width: 4, material: {color: "#475569"}}],
-            },
-          },
-        });
-        map.add(layerTuyenDuong);
-
+        // 🌲 TẦNG ĐỈNH 3: Quần thể thực thể cây xanh lập thể 3D hình khối (Cylinder + Cone)
         const treeLayer = new GeoJSONLayer({
-          url: "http://localhost:5000/api/map/cay-xanh",
+          url: `http://localhost:5000/api/map/cay-xanh?t=${timestamp}`,
           title: "Quần thể cây xanh lập thể",
           outFields: ["*"],
           renderer: {
@@ -126,7 +144,7 @@ const Map3D = forwardRef((props, ref) => {
               symbolLayers: [
                 {
                   type: "object",
-                  resource: {primitive: "cylinder"},
+                  resource: {primitive: "cylinder"}, // Gốc thân cây trụ gỗ nâu
                   material: {color: "#78350f"},
                   width: 0.4,
                   depth: 0.4,
@@ -134,7 +152,7 @@ const Map3D = forwardRef((props, ref) => {
                 },
                 {
                   type: "object",
-                  resource: {primitive: "cone"},
+                  resource: {primitive: "cone"}, // Tán lá cây xanh hình nón lập thể
                   material: {color: "#16a34a"},
                   width: 3.0,
                   depth: 3.0,
@@ -142,55 +160,62 @@ const Map3D = forwardRef((props, ref) => {
                 },
               ],
             },
+            // Biến đổi kích thước hình khối 3D đè khít theo dữ liệu thực tế từ PostgreSQL
             visualVariables: [
               {type: "size", field: "chieuCao", axis: "height", valueUnit: "meters"},
               {type: "size", field: "duongKinhTan", axis: "width-and-depth", valueUnit: "meters"},
             ],
           },
         });
-        map.add(treeLayer);
-        treeLayerRef.current = treeLayer;
 
-        const suCoRenderer = {
-          type: "simple",
-          symbol: {
-            type: "point-3d",
-            symbolLayers: [
-              {
-                type: "icon",
-                size: 14,
-                resource: {primitive: "circle"},
-                material: {color: "#ef4444"}, // Đốm tròn màu đỏ rực định vị vị trí sự cố
-                outline: {color: "#ffffff", width: 1.5},
-              },
-            ],
-          },
-        };
-
+        // 🚨 TẦNG PHÒNG THỦ: Lớp cảnh báo đốm đỏ mật độ sự cố thực địa (Point)
         const suCoLayer = new GeoJSONLayer({
-          url: "http://localhost:5000/api/map/su-co",
+          url: `http://localhost:5000/api/map/su-co?t=${timestamp}`,
           title: "Bản đồ nhiệt mật độ sự cố",
-          geometryType: "point", // 🌟 BỔ SUNG DÒNG NÀY: Ép ArcGIS nhận diện đây là lớp Điểm (Point)
+          geometryType: "point",
           outFields: ["*"],
-          renderer: suCoRenderer,
+          renderer: {
+            type: "simple",
+            symbol: {
+              type: "point-3d",
+              symbolLayers: [
+                {
+                  type: "icon",
+                  size: 14,
+                  resource: {primitive: "circle"},
+                  material: {color: "#ef4444"}, // Màu đỏ cảnh báo
+                  outline: {color: "#ffffff", width: 1.5},
+                },
+              ],
+            },
+          },
           popupTemplate: {
             title: "<span style='color:#ef4444;font-weight:bold;'>🚨 CHI TIẾT SỰ CỐ THỰC ĐỊA</span>",
             content:
               "<b>Phân loại sự cố:</b> {tieuDe}<br><b>Mô tả diễn biến:</b> {moTa}<br><b>Trạng thái:</b> {trangThai}",
           },
         });
-        map.add(suCoLayer);
+
+        // Ép các lớp xếp chồng đè lên nhau theo chuẩn cấu trúc trật tự địa lý GIS
+        map.addMany([layerKhuVuc, layerTuyenDuong, treeLayer, suCoLayer]);
+
+        // Đổ ngược luồng vào Ref để các Effect khác tái sử dụng mà không nạp lại Map
+        layerKhuVucRef.current = layerKhuVuc;
+        layerTuyenDuongRef.current = layerTuyenDuong;
+        treeLayerRef.current = treeLayer;
         suCoLayerRef.current = suCoLayer;
 
+        // 🌟 ĐÃ GỠ BỎ ĐOẠN CODE layerTuyenDuong.when TỰ ĐỘNG ÉP CAMERA BAY VỀ QUẬN 1 LÚC ĐẦU
+        // Giúp bản đồ giữ nguyên vị trí bao quát toàn thành phố lúc vừa vào hệ thống.
+
+        // XỬ LÝ SỰ KIỆN CLICK CHUỘT TRÊN MÀN HÌNH BẢN ĐỒ
         view.on("click", (event) => {
           view.hitTest(event).then((response) => {
             const results = response.results;
             const treeGraphic = results.find((r) => r.graphic && r.graphic.layer === treeLayer);
 
             if (treeGraphic) {
-              // TRƯỜNG HỢP 1: Người dân click TRÚNG cây xanh lập thể
               const attr = treeGraphic.graphic.attributes;
-
               if (props.onSelectTree) {
                 props.onSelectTree({
                   id: attr.id,
@@ -198,27 +223,22 @@ const Map3D = forwardRef((props, ref) => {
                   tinhTrang: attr.tinhTrang,
                   chieuCao: attr.chieuCao,
                   duongKinhTan: attr.duongKinhTan,
-                  // Lấy chính xác tọa độ gốc của cây từ CSDL chứ không lấy điểm click lệch vỉa hè
                   lon: treeGraphic.graphic.geometry.longitude,
                   lat: treeGraphic.graphic.geometry.latitude,
                 });
               }
-
-              // Đóng Form click điểm bất kỳ (nếu đang mở)
               if (props.onMapClickPublic) props.onMapClickPublic(null);
             } else {
-              // TRƯỜNG HỢP 2: Click trượt ra ngoài khoảng trống vỉa hè
-              // Bật chế độ lấy tọa độ tự do nếu chưa đăng nhập Admin
               const longitude = event.mapPoint.longitude;
               const latitude = event.mapPoint.latitude;
 
               if (props.onMapClickPublic) props.onMapClickPublic({lon: longitude, lat: latitude});
-              if (props.onSelectTree) props.onSelectTree(null); // Ẩn thanh Bottom Bar màu đen đi
+              if (props.onSelectTree) props.onSelectTree(null);
             }
           });
         });
       })
-      .catch((err) => console.error("ArcGIS Error: ", err));
+      .catch((err) => console.error("ArcGIS Setup Error: ", err));
 
     return () => {
       if (view) {
@@ -228,6 +248,82 @@ const Map3D = forwardRef((props, ref) => {
     };
   }, []);
 
+  // ===================================================================
+  // 🌟 EFFECT 2: LẮNG NGHE ĐỔI KHU VỰC - PHÂN CẤP CAMERA LINH HOẠT
+  // ===================================================================
+  useEffect(() => {
+    if (!viewRef.current || !layerKhuVucRef.current) return;
+
+    const maKhuVuc = props.currentKhuVucId || "";
+    const timestamp = new Date().getTime();
+
+    // 🌐 KỊCH BẢN 1: Khi chọn "Toàn bộ TP.HCM" (maKhuVuc rỗng "")
+    if (maKhuVuc === "") {
+      console.log("🏙️ Camera lùi về khoảng không gian bao quát toàn bộ TP.HCM");
+
+      // Tải lại toàn bộ dữ liệu thô không lọc không gian
+      layerKhuVucRef.current.url = `http://localhost:5000/api/map/khu-vuc?t=${timestamp}`;
+      layerTuyenDuongRef.current.url = `http://localhost:5000/api/map/tuyen-duong?t=${timestamp}`;
+      layerKhuVucRef.current.refresh();
+      layerTuyenDuongRef.current.refresh();
+
+      // Cất cánh camera lên độ cao lớn ngắm trọn vẹn ranh giới TP.HCM
+      viewRef.current
+        .goTo(
+          {
+            center: [106.66017, 10.76262], // Tâm bản đồ thành phố
+            z: 12000, // Độ cao không trung 12km
+            tilt: 0, // Trở về góc phẳng 2D bao quát tốt nhất
+            heading: 0,
+          },
+          {duration: 1500, easing: "in-out-cubic"},
+        )
+        .catch(() => {});
+
+      return; // Ngắt tiến trình tại đây, không cho lao camera xuống cận cảnh phân khu
+    }
+    // ----------------------------------------------------------------
+    // 🏢 KỊCH BẢN 2 & 3: Khi chọn Quận 1 hoặc các phân khu cụ thể (maKhuVuc KHÁC rỗng)
+    // ----------------------------------------------------------------
+    console.log(`🚀 Đang chuyển mạch và đồng bộ tọa độ cho phân khu ID: ${maKhuVuc}`);
+
+    // Cập nhật API lọc động gửi xuống PostgreSQL
+    layerKhuVucRef.current.url = `http://localhost:5000/api/map/khu-vuc?maKhuVuc=${maKhuVuc}&t=${timestamp}`;
+    layerTuyenDuongRef.current.url = `http://localhost:5000/api/map/tuyen-duong?maKhuVuc=${maKhuVuc}&t=${timestamp}`;
+
+    // Ép làm tươi đồ họa đồ thị
+    layerKhuVucRef.current.refresh();
+    layerTuyenDuongRef.current.refresh();
+
+    // 🌟 SỬA ĐOẠN NÀY: Dùng hàm queryExtent để bắt lớp dữ liệu tính toán tọa độ thật từ DB vừa trả về
+    layerKhuVucRef.current.when(() => {
+      // Thiết lập câu lệnh truy vấn quét toàn bộ thực thể vừa nạp của Layer
+      const query = layerKhuVucRef.current.createQuery();
+
+      layerKhuVucRef.current
+        .queryExtent(query)
+        .then((response) => {
+          // response.extent chính là tọa độ bao vây CHÍNH XÁC 100% của phân khu vừa chọn
+          if (response && response.extent) {
+            return viewRef.current.goTo(response.extent, {
+              duration: 1400,
+              easing: "in-out-cubic",
+            });
+          }
+        })
+        .then(() => {
+          // Sau khi sà xuống đúng vùng đất mới, tiến hành nghiêng góc phối cảnh 3D ngắm cây
+          return viewRef.current.goTo({tilt: 52, heading: 325}, {duration: 500});
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") {
+            console.error("🔴 Lỗi tính toán định vị không gian phân khu:", err);
+          }
+        });
+    });
+  }, [props.currentKhuVucId]);
+
+  // Hàm xử lý đẩy dữ liệu phản ánh sự cố lề tự do của người dân lên máy chủ API
   const handlePostSuCo = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -250,7 +346,6 @@ const Map3D = forwardRef((props, ref) => {
         if (suCoLayerRef.current && typeof suCoLayerRef.current.refresh === "function") {
           suCoLayerRef.current.refresh();
         }
-        // 🌟 THÊM DÒNG NÀY: Báo cho App.jsx tải lại danh sách lề phải lập tức
         if (props.onReportSuccess) props.onReportSuccess();
       } else {
         alert("Gặp lỗi trong quá trình ghi nhận không gian.");
