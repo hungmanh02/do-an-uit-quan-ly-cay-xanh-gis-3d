@@ -1049,133 +1049,196 @@ function App() {
           }}
         />
 
+        {/* ===================================================================
+    🎯 BẢN CHUẨN NGHIỆM THU: THANH BOTTOM BAR THÔNG TIN CÂY XANH 2 TẦNG NÚT
+    =================================================================== */}
         {selectedTree && (
           <div
             style={{
               position: "absolute",
               bottom: "30px",
               left: "20px",
-              right: showRightSidebar ? "370px" : "20px",
+              right: showRightSidebar ? "200px" : "20px",
               zIndex: 1000,
-              backgroundColor: "rgba(15, 23, 42, 0.95)",
+              backgroundColor: "rgba(15, 23, 42, 0.96)",
               border: "1px solid #10b981",
               borderRadius: "16px",
               padding: "16px 24px",
               color: "#fff",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              transition: "all 0.3s ease-in-out",
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent: "space-between", // Đẩy kịch 2 đầu
               alignItems: "center",
+              gap: "40px",
             }}
           >
-            <div>
-              <div style={{display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px"}}>
-                <span style={{fontSize: "18px"}}>🌲</span>
-                <h3 style={{margin: 0, fontSize: "15px", color: "#10b981", fontWeight: "bold"}}>
-                  {selectedTree.loaiCay}
-                </h3>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    padding: "2px 6px",
-                    backgroundColor: "#1e293b",
-                    borderRadius: "4px",
-                    color: "#64748b",
-                  }}
-                >
-                  ID: #{selectedTree.id}
-                </span>
+            {/* 🌲 KHỐI TRÁI: THÔNG TIN CÂY XANH (NẰM NGANG HOÀN HẢO) */}
+            <div style={{display: "flex", alignItems: "center", gap: "28px", flex: 1, minWidth: 0}}>
+              {/* Icon, Tên cây & ID */}
+              <div style={{display: "flex", alignItems: "center", gap: "12px", flexShrink: 0}}>
+                <span style={{fontSize: "22px"}}>🌲</span>
+                <div style={{display: "flex", flexDirection: "column", gap: "2px"}}>
+                  <h3 style={{margin: 0, fontSize: "15px", color: "#10b981", fontWeight: "bold", whiteSpace: "nowrap"}}>
+                    {selectedTree.loaiCay}
+                  </h3>
+                  <span style={{fontSize: "11px", color: "#64748b", fontFamily: "monospace"}}>
+                    ID: #{selectedTree.id}
+                  </span>
+                </div>
               </div>
-              <div style={{display: "flex", gap: "20px", fontSize: "12px", color: "#94a3b8"}}>
-                <span>
+
+              {/* Thông số kỹ thuật dàn ngang */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "24px",
+                  fontSize: "12px",
+                  color: "#94a3b8",
+                  alignItems: "center",
+                  flexWrap: "nowrap",
+                }}
+              >
+                <span style={{whiteSpace: "nowrap"}}>
                   📐 Đường kính tán: <b style={{color: "#fff"}}>{selectedTree.duongKinhTan} m</b>
                 </span>
-                <span>
+                <span style={{whiteSpace: "nowrap"}}>
                   📏 Chiều cao thực tế: <b style={{color: "#fff"}}>{selectedTree.chieuCao} m</b>
                 </span>
-                <span>
+                <span style={{whiteSpace: "nowrap"}}>
                   ❤️ Sức khỏe: <b style={{color: "#38bdf8"}}>{selectedTree.tinhTrang}</b>
                 </span>
               </div>
             </div>
 
-            <div style={{display: "flex", alignItems: "center", gap: "12px"}}>
-              {/* 🌟 PHÂN QUYỀN TRÊN THANH BLACK BOTTOM BAR: */}
-              {isLoggedIn ? (
-                /* NẾU LÀ ADMIN: Hiện nút Sửa và Xóa thực thể cây trực tiếp */
-                <>
+            {/* 🛠️ KHỐI PHẢI: CỤM NÚT BẤM 2 TẦNG ĐỐI XỨNG & TOẠ ĐỘ */}
+            <div style={{display: "flex", alignItems: "center", gap: "16px", flexShrink: 0}}>
+              {/* Khối cấu trúc 2 tầng nút */}
+              <div style={{display: "flex", flexDirection: "column", gap: "6px", width: "190px", flexShrink: 0}}>
+                {isLoggedIn ? (
+                  <>
+                    {/* TẦNG 1: Báo cáo sự cố rộng 100% */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (typeof setActiveCrudTable === "function") {
+                          setActiveCrudTable("su_co");
+                          setCrudAction("create");
+                          setIncidentFormData({
+                            id: "",
+                            tieuDe: `Sự cố cây #${selectedTree?.id} (${selectedTree?.loaiCay})`,
+                            moTa: `Ghi nhận tình trạng: ${selectedTree?.tinhTrang}. Cần xử lý gấp.`,
+                            trangThai: "Chưa xử lý",
+                            lon: selectedTree?.lon,
+                            lat: selectedTree?.lat,
+                            maCay: selectedTree?.id,
+                          });
+                        }
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "6px 0",
+                        backgroundColor: "#ef4444",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: "bold",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      ⚠️ Báo cáo sự cố
+                    </button>
+
+                    {/* TẦNG 2: Hai nút Sửa và Xóa chia đôi 50/50 */}
+                    <div style={{display: "flex", gap: "6px", width: "100%"}}>
+                      <button
+                        onClick={() => {
+                          setCrudAction("update");
+                          setTreeFormData({
+                            id: selectedTree.id,
+                            loaiCay: selectedTree.loaiCay,
+                            tinhTrang: selectedTree.tinhTrang,
+                            chieuCao: selectedTree.chieuCao,
+                            duongKinhTan: selectedTree.duongKinhTan,
+                            lon: selectedTree.lon,
+                            lat: selectedTree.lat,
+                          });
+                          setActiveCrudTable("cay_xanh");
+                        }}
+                        style={{
+                          flex: 1,
+                          backgroundColor: "#f59e0b",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "6px",
+                          padding: "5px 0",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        ✏️ Sửa cây
+                      </button>
+                      <button
+                        style={{
+                          flex: 1,
+                          backgroundColor: "#e11d48",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "6px",
+                          padding: "5px 0",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        🗑️ Xóa cây
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  /* NẾU LÀ NGƯỜI DÂN */
                   <button
-                    onClick={() => {
-                      setCrudAction("update");
-                      setTreeFormData({
-                        id: selectedTree.id,
-                        loaiCay: selectedTree.loaiCay,
-                        tinhTrang: selectedTree.tinhTrang,
-                        chieuCao: selectedTree.chieuCao,
-                        duongKinhTan: selectedTree.duongKinhTan,
-                        lon: selectedTree.lon,
-                        lat: selectedTree.lat,
-                      });
-                      setActiveCrudTable("cay_xanh");
-                    }}
                     style={{
-                      backgroundColor: "#f59e0b",
+                      width: "100%",
+                      backgroundColor: "#e11d48",
                       color: "#fff",
                       border: "none",
                       borderRadius: "6px",
-                      padding: "6px 12px",
+                      padding: "8px 0",
                       fontSize: "11px",
                       fontWeight: "bold",
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    ✏️ Sửa cây
+                    🚨 Báo sự cố cây này
                   </button>
-                  <button
-                    onClick={async () => {
-                      if (window.confirm("Xóa vĩnh viễn cây này khỏi PostGIS?")) {
-                        await fetch(`http://localhost:5000/api/map/cay-xanh/${selectedTree.id}`, {method: "DELETE"});
-                        setSelectedTree(null);
-                        map3DRef.current?.refreshLayers();
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#ef4444",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "6px 12px",
-                      fontSize: "11px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                    }}
-                  >
-                    🗑️ Xóa cây
-                  </button>
-                </>
-              ) : (
-                /* NẾU LÀ NGƯỜI DÂN: Hiện nút báo sự cố công cộng */
-                <button
-                  onClick={() => {
-                    setPublicCoords({lon: parseFloat(selectedTree.lon), lat: parseFloat(selectedTree.lat)});
-                    setTieuDePublic(`Sự cố tại cây #${selectedTree.id}`);
-                    setMoTaPublic(`Cây ${selectedTree.loaiCay} (#${selectedTree.id}): `);
-                    setShowLeftSidebar(true);
-                  }}
-                  style={{
-                    backgroundColor: "#e11d48",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "8px",
-                    padding: "8px 14px",
-                    fontSize: "12px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  🚨 Báo sự cố cây này
-                </button>
-              )}
-              <div style={{fontSize: "11px", color: "#64748b"}}>
+                )}
+              </div>
+
+              {/* Tọa độ kịch phải ngăn bằng vách dọc */}
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#64748b",
+                  fontFamily: "monospace",
+                  whiteSpace: "nowrap",
+                  paddingLeft: "12px",
+                  borderLeft: "1px solid #334155",
+                  lineHeight: "1.4",
+                  flexShrink: 0,
+                }}
+              >
                 X: {parseFloat(selectedTree.lon).toFixed(5)}
                 <br />
                 Y: {parseFloat(selectedTree.lat).toFixed(5)}
