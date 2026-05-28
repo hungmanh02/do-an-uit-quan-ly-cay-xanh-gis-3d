@@ -1,0 +1,23 @@
+# 📦 Thư mục thư viện nặng, cấm add lên Git
+node_modules/
+jspm_packages/
+web_modules/
+
+# 🔐 File bảo mật chứa mật khẩu Database PostGIS, cấm tuyệt đối add lên Git
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 🚀 Thư mục Build sản phẩm của React (Vite/CRA)
+dist/
+build/
+.cache/
+
+# ⚙️ Cấu hình cá nhân của hệ điều hành và IDE
+.vscode/
+.idea/
+.DS_Store
+thumbs.db
+*.log

@@ -1,0 +1,20 @@
+tree-gis-project/
+├── backend/
+│   ├── config/
+│   │   └── db.js          # Kết nối PostgreSQL/PostGIS
+│   ├── controllers/
+│   │   └── mapController.js # Xử lý logic API không gian
+│   ├── routes/
+│   │   └── mapRoutes.js     # Định nghĩa các tuyến API
+│   ├── server.js          # Khởi chạy ứng dụng Backend
+│   └── package.json
+└── frontend/
+    ├── src/
+    │   ├── components/
+    │   │   ├── Map3D.jsx      # Thành phần hiển thị ArcGIS SceneView 3D
+    │   │   └── Sidebar.jsx    # Thanh điều khiển, bộ lọc và thống kê
+    │   ├── App.jsx            # Thành phần chính điều phối giao diện
+    │   └── main.jsx
+    ├── index.html
+    ├── tailwind.config.js # Cấu hình giao diện Tailwind CSS
+    └── package.json
