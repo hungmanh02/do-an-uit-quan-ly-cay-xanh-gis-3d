@@ -1,6 +1,6 @@
-import React, {useEffect, useRef, useState, useImperativeHandle, forwardRef} from "react";
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from "react";
 import * as esriLoader from "esri-loader";
-const {loadModules} = esriLoader;
+const { loadModules } = esriLoader;
 
 const Map3D = forwardRef((props, ref) => {
   const mapRef = useRef(null);
@@ -12,7 +12,7 @@ const Map3D = forwardRef((props, ref) => {
   const treeLayerRef = useRef(null);
   const suCoLayerRef = useRef(null);
 
-  const [reportForm, setReportForm] = useState({show: false, lon: "", lat: "", type: "Cây ngã đổ", desc: ""});
+  const [reportForm, setReportForm] = useState({ show: false, lon: "", lat: "", type: "Cây ngã đổ", desc: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Xuất các hàm điều khiển ra môi trường App.jsx bên ngoài
@@ -39,7 +39,7 @@ const Map3D = forwardRef((props, ref) => {
             {
               duration: 1800,
               easing: "in-out-cubic", // Tốc độ mượt mà giảm tốc khi đến nơi
-            },
+            }
           )
           .catch((err) => {
             console.error("Lỗi điều hướng camera:", err);
@@ -54,7 +54,7 @@ const Map3D = forwardRef((props, ref) => {
   useEffect(() => {
     let view;
 
-    loadModules(["esri/Map", "esri/views/SceneView", "esri/layers/GeoJSONLayer", "esri/config"], {css: true})
+    loadModules(["esri/Map", "esri/views/SceneView", "esri/layers/GeoJSONLayer", "esri/config"], { css: true })
       .then(([Map, SceneView, GeoJSONLayer, esriConfig]) => {
         esriConfig.apiKey =
           "AAPK973c5d6c5c06497394db4372579dfcc1UfGk45X8wzM9b-Nf53k0VfG4_P-XpG7bWhR6k9-Z_6vK6MhG9vK-jR_m_L_J9vKG";
@@ -96,8 +96,8 @@ const Map3D = forwardRef((props, ref) => {
             symbolLayers: [
               {
                 type: "fill",
-                material: {color: [15, 23, 42, 0.4]}, // Slate-900 độ trong suốt 40%
-                outline: {color: [244, 63, 94, 0.9], size: 2.5}, // Viền hồng Rose-500 dày 2.5px
+                material: { color: [15, 23, 42, 0.4] }, // Slate-900 độ trong suốt 40%
+                outline: { color: [244, 63, 94, 0.9], size: 2.5 }, // Viền hồng Rose-500 dày 2.5px
               },
             ],
           },
@@ -106,6 +106,9 @@ const Map3D = forwardRef((props, ref) => {
         const layerKhuVuc = new GeoJSONLayer({
           url: `http://localhost:5000/api/map/khu-vuc?t=${timestamp}`,
           title: "Ranh giới quản lý hành chính",
+          elevationInfo: {
+            mode: "on-the-ground", // 🌟 Ép đa giác nằm phẳng lì bám chặt mặt đất tự nhiên
+          },
           renderer: rendererKhuVuc,
           outFields: ["*"],
         });
@@ -116,7 +119,10 @@ const Map3D = forwardRef((props, ref) => {
           title: "Mạng lưới giao thông vỉa hè",
           geometryType: "polyline",
           outFields: ["*"],
-          elevationInfo: {mode: "on-the-ground"},
+          elevationInfo: {
+            mode: "relative-to-ground",
+            offset: 0.3, // Nâng tim đường lên 0.3 mét so với mặt đất để không bị che khuất
+          },
           renderer: {
             type: "simple",
             symbol: {
@@ -125,7 +131,7 @@ const Map3D = forwardRef((props, ref) => {
                 {
                   type: "line",
                   size: 4.0, // Độ rộng vỉa hè 4 mét
-                  material: {color: "#475569"}, // Tông màu xám đường phố đô thị
+                  material: { color: "#475569" }, // Tông màu xám đường phố đô thị
                 },
               ],
             },
@@ -137,6 +143,10 @@ const Map3D = forwardRef((props, ref) => {
           url: `http://localhost:5000/api/map/cay-xanh?t=${timestamp}`,
           title: "Quần thể cây xanh lập thể",
           outFields: ["*"],
+          elevationInfo: {
+            mode: "relative-to-ground",
+            offset: 0, // Gốc cây bắt đầu từ vỉa hè
+          },
           renderer: {
             type: "simple",
             symbol: {
@@ -144,16 +154,16 @@ const Map3D = forwardRef((props, ref) => {
               symbolLayers: [
                 {
                   type: "object",
-                  resource: {primitive: "cylinder"}, // Gốc thân cây trụ gỗ nâu
-                  material: {color: "#78350f"},
+                  resource: { primitive: "cylinder" }, // Gốc thân cây trụ gỗ nâu
+                  material: { color: "#78350f" },
                   width: 0.4,
                   depth: 0.4,
                   anchor: "bottom",
                 },
                 {
                   type: "object",
-                  resource: {primitive: "cone"}, // Tán lá cây xanh hình nón lập thể
-                  material: {color: "#16a34a"},
+                  resource: { primitive: "cone" }, // Tán lá cây xanh hình nón lập thể
+                  material: { color: "#16a34a" },
                   width: 3.0,
                   depth: 3.0,
                   anchor: "center",
@@ -162,8 +172,8 @@ const Map3D = forwardRef((props, ref) => {
             },
             // Biến đổi kích thước hình khối 3D đè khít theo dữ liệu thực tế từ PostgreSQL
             visualVariables: [
-              {type: "size", field: "chieuCao", axis: "height", valueUnit: "meters"},
-              {type: "size", field: "duongKinhTan", axis: "width-and-depth", valueUnit: "meters"},
+              { type: "size", field: "chieuCao", axis: "height", valueUnit: "meters" },
+              { type: "size", field: "duongKinhTan", axis: "width-and-depth", valueUnit: "meters" },
             ],
           },
         });
@@ -182,9 +192,9 @@ const Map3D = forwardRef((props, ref) => {
                 {
                   type: "icon",
                   size: 14,
-                  resource: {primitive: "circle"},
-                  material: {color: "#ef4444"}, // Màu đỏ cảnh báo
-                  outline: {color: "#ffffff", width: 1.5},
+                  resource: { primitive: "circle" },
+                  material: { color: "#ef4444" }, // Màu đỏ cảnh báo
+                  outline: { color: "#ffffff", width: 1.5 },
                 },
               ],
             },
@@ -232,7 +242,7 @@ const Map3D = forwardRef((props, ref) => {
               const longitude = event.mapPoint.longitude;
               const latitude = event.mapPoint.latitude;
 
-              if (props.onMapClickPublic) props.onMapClickPublic({lon: longitude, lat: latitude});
+              if (props.onMapClickPublic) props.onMapClickPublic({ lon: longitude, lat: latitude });
               if (props.onSelectTree) props.onSelectTree(null);
             }
           });
@@ -276,7 +286,7 @@ const Map3D = forwardRef((props, ref) => {
             tilt: 0, // Trở về góc phẳng 2D bao quát tốt nhất
             heading: 0,
           },
-          {duration: 1500, easing: "in-out-cubic"},
+          { duration: 1500, easing: "in-out-cubic" }
         )
         .catch(() => {});
 
@@ -313,7 +323,7 @@ const Map3D = forwardRef((props, ref) => {
         })
         .then(() => {
           // Sau khi sà xuống đúng vùng đất mới, tiến hành nghiêng góc phối cảnh 3D ngắm cây
-          return viewRef.current.goTo({tilt: 52, heading: 325}, {duration: 500});
+          return viewRef.current.goTo({ tilt: 52, heading: 325 }, { duration: 500 });
         })
         .catch((err) => {
           if (err.name !== "AbortError") {
@@ -330,7 +340,7 @@ const Map3D = forwardRef((props, ref) => {
     try {
       const response = await fetch("http://localhost:5000/api/map/su-co", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tieu_de: reportForm.type,
           mo_ta: reportForm.desc,
@@ -342,7 +352,7 @@ const Map3D = forwardRef((props, ref) => {
 
       if (response.ok) {
         alert("🎉 Hệ thống đã tiếp nhận vị trí phản ánh sự cố thành công!");
-        setReportForm({show: false, lon: "", lat: "", type: "Cây ngã đổ", desc: ""});
+        setReportForm({ show: false, lon: "", lat: "", type: "Cây ngã đổ", desc: "" });
         if (suCoLayerRef.current && typeof suCoLayerRef.current.refresh === "function") {
           suCoLayerRef.current.refresh();
         }
@@ -359,8 +369,8 @@ const Map3D = forwardRef((props, ref) => {
   };
 
   return (
-    <div style={{width: "100%", height: "100%", position: "relative"}}>
-      <div ref={mapRef} style={{width: "100%", height: "100%"}} />
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
 
       {reportForm.show && (
         <div
@@ -381,7 +391,7 @@ const Map3D = forwardRef((props, ref) => {
         >
           <button
             type="button"
-            onClick={() => setReportForm({...reportForm, show: false})}
+            onClick={() => setReportForm({ ...reportForm, show: false })}
             style={{
               position: "absolute",
               top: "12px",
@@ -396,24 +406,24 @@ const Map3D = forwardRef((props, ref) => {
           >
             ✕
           </button>
-          <h3 style={{margin: "0 0 12px 0", fontSize: "13px", color: "#f43f5e", fontWeight: "bold"}}>
+          <h3 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#f43f5e", fontWeight: "bold" }}>
             🚨 PHẢN ÁNH SỰ CỐ THỰC ĐỊA
           </h3>
           <form
             onSubmit={handlePostSuCo}
-            style={{display: "flex", flexDirection: "column", gap: "8px", fontSize: "11px"}}
+            style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "11px" }}
           >
             <div>
-              <label style={{color: "#94a3b8"}}>Vị trí click Maps:</label>
-              <div style={{color: "#38bdf8", marginTop: "2px", fontWeight: "600"}}>
+              <label style={{ color: "#94a3b8" }}>Vị trí click Maps:</label>
+              <div style={{ color: "#38bdf8", marginTop: "2px", fontWeight: "600" }}>
                 X: {reportForm.lon}, Y: {reportForm.lat}
               </div>
             </div>
-            <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-              <label style={{color: "#94a3b8"}}>Loại sự cố:</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <label style={{ color: "#94a3b8" }}>Loại sự cố:</label>
               <select
                 value={reportForm.type}
-                onChange={(e) => setReportForm({...reportForm, type: e.target.value})}
+                onChange={(e) => setReportForm({ ...reportForm, type: e.target.value })}
                 style={{
                   padding: "6px",
                   backgroundColor: "#1e293b",
@@ -427,14 +437,14 @@ const Map3D = forwardRef((props, ref) => {
                 <option value="Sâu bệnh/Héo úa">🐛 Cây mục rỗng gốc hiểm họa</option>
               </select>
             </div>
-            <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-              <label style={{color: "#94a3b8"}}>Mô tả chi tiết:</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <label style={{ color: "#94a3b8" }}>Mô tả chi tiết:</label>
               <textarea
                 rows="2"
                 placeholder="Ví dụ: Cây phượng vĩ đổ đè lề đường..."
                 required
                 value={reportForm.desc}
-                onChange={(e) => setReportForm({...reportForm, desc: e.target.value})}
+                onChange={(e) => setReportForm({ ...reportForm, desc: e.target.value })}
                 style={{
                   padding: "6px",
                   backgroundColor: "#1e293b",
@@ -445,10 +455,10 @@ const Map3D = forwardRef((props, ref) => {
                 }}
               />
             </div>
-            <div style={{display: "flex", gap: "8px", marginTop: "6px"}}>
+            <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
               <button
                 type="button"
-                onClick={() => setReportForm({...reportForm, show: false})}
+                onClick={() => setReportForm({ ...reportForm, show: false })}
                 style={{
                   flex: 1,
                   padding: "7px",
