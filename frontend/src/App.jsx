@@ -171,6 +171,7 @@ function App() {
   useEffect(() => {
     fetchSuCoTuDB();
     setSelectedTree(null);
+    setClickCoords(null); // Reset điểm gắm tọa độ khi đổi phân khu
   }, [khuVucId]);
 
   // XỬ LÝ ĐĂNG NHẬP / ĐĂNG XUẤT
@@ -195,6 +196,7 @@ function App() {
     if (window.confirm("Bạn có chắc chắn muốn đăng xuất tài khoản quản trị?")) {
       setIsLoggedIn(false);
       setActiveCrudTable(null);
+      setClickCoords(null);
     }
   };
 
@@ -259,6 +261,7 @@ function App() {
       if (response.ok) {
         alert("🎉 Thao tác cơ sở dữ liệu thành công!");
         setActiveCrudTable(null);
+        setClickCoords(null); // Clear điểm chấm tọa độ sau khi thêm xong
         fetchSuCoTuDB();
         if (map3DRef.current) map3DRef.current.refreshLayers();
       } else {
@@ -716,7 +719,6 @@ function App() {
                           gap: "6px",
                         }}
                       >
-                        {/* Cả Quản lý và Nhân viên đều ghi được Nhật ký (POST) */}
                         <button
                           onClick={() => {
                             setCrudAction("create");
@@ -884,7 +886,7 @@ function App() {
                     )}
                   </div>
 
-                  {/* 🟩 5. TÍNH NĂNG IMPORT TIỆN ÍCH EXCEL (CHỈ QUẢN LÝ CÓ QUỀN) */}
+                  {/* 🏢 5. TÍNH NĂNG IMPORT TIỆN ÍCH EXCEL (CHỈ QUẢN LÝ CÓ QUỀN) */}
                   {userRole === "quan_ly" && (
                     <div style={{ marginTop: "4px" }}>
                       <ExcelImporter onImportSuccess={() => map3DRef.current?.refreshLayers()} />
@@ -906,7 +908,7 @@ function App() {
                       }}
                     >
                       💡 <b>Quy trình công cộng:</b> Mạnh bấm chọn một cây xanh vỉa hè $\rightarrow$ Thanh màu đen hiện
-                      lên $\rightarrow$ Ấn nút <b>"🚨 Báo sự cố cây này"</b> để lấy chuẩn xác tọa độ gốc thân cây vào
+                      len $\rightarrow$ Ấn nút <b>"🚨 Báo sự cố cây này"</b> để lấy chuẩn xác tọa độ gốc thân cây vào
                       đây điền form nhé!
                     </div>
                   ) : (
@@ -1086,7 +1088,7 @@ function App() {
                     borderRadius: "50%",
                   }}
                 ></span>
-                ĐÃ KẾT NỐI HỆ THỐNG POSTGIS
+                ĐÃ KẾT NỐI HỆ THỐNG POSTGIS
               </div>
               {isLoggedIn ? (
                 <button
@@ -1165,12 +1167,90 @@ function App() {
           onSelectTree={setSelectedTree}
           onReportSuccess={fetchSuCoTuDB}
           onMapClickPublic={(coords) => {
-            if (!isLoggedIn && coords) {
-              setPublicCoords({ lon: coords.lon, lat: coords.lat });
-              setShowLeftSidebar(true);
+            // 🎯 LÔ-GIC ĐÃ CẬP NHẬT: Nhận diện và gán tọa độ khi click khoảng trống
+            if (coords) {
+              setClickCoords({ lon: coords.lon, lat: coords.lat });
+
+              // Kịch bản 1: Nếu là người dân thông thường -> Kích hoạt Form báo cáo sự cố công cộng
+              if (!isLoggedIn) {
+                setPublicCoords({ lon: coords.lon, lat: coords.lat });
+                setShowLeftSidebar(true);
+              }
+            } else {
+              setClickCoords(null);
             }
           }}
         />
+
+        {/* 🌟 NÚT CHỨC NĂNG NỔI (ĐÃ THÊM MỚI): Hiện đè trên góc Map phục vụ Cán bộ thêm cây nhanh */}
+        {clickCoords && isLoggedIn && (userRole === "quan_ly" || userRole === "nhan_vien") && (
+          <div
+            style={{
+              position: "absolute",
+              top: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 500,
+              backgroundColor: "#1e293b",
+              border: "2px solid #10b981",
+              borderRadius: "12px",
+              padding: "10px 16px",
+              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.7)",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              animation: "fadeIn 0.2s ease-in-out",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#cbd5e1" }}>
+              📍 Toạ độ đã chấm:{" "}
+              <b style={{ color: "#34d399" }}>
+                {clickCoords.lon.toFixed(5)}, {clickCoords.lat.toFixed(5)}
+              </b>
+            </div>
+            <button
+              onClick={() => {
+                setCrudAction("create");
+                // Đổ chuẩn xác tọa độ thực địa vừa chấm vào Form dữ liệu Cây Xanh
+                setTreeFormData({
+                  MaCayXanh: "",
+                  MaTuyenDuong: khuVucId || "1",
+                  loaiCay: "",
+                  tinhTrang: "Khỏe mạnh",
+                  chieuCao: "",
+                  duongKinhTan: "",
+                  lon: clickCoords.lon,
+                  lat: clickCoords.lat,
+                });
+                setActiveCrudTable("cay_xanh"); // Bung mở Modal Form nhập liệu
+              }}
+              style={{
+                padding: "6px 12px",
+                backgroundColor: "#10b981",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "11px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              🌳 Thêm cây tại đây
+            </button>
+            <button
+              onClick={() => setClickCoords(null)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                fontSize: "12px",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* THANH BOTTOM BAR ĐEN THÔNG TIN CÂY ĐỒNG BỘ NÚT XÓA */}
         {selectedTree && (
@@ -1272,7 +1352,7 @@ function App() {
                         onClick={() => {
                           setCrudAction("update");
                           setTreeFormData({
-                            MaCayXanh: selectedTree.id, // ID bốc từ ArcGIS gán vào khóa chính MaCayXanh Form
+                            MaCayXanh: selectedTree.id,
                             MaTuyenDuong: selectedTree.maTuyenDuong || "1",
                             loaiCay: selectedTree.loaiCay,
                             tinhTrang: selectedTree.tinhTrang,
@@ -1482,7 +1562,7 @@ function App() {
       </div>
 
       {/* ===================================================================
-          🔏 HỆ THỐNG CÁC POPUP MODALS (GIỮ NGUYÊN GIAO DIỆN CHUẨN)
+          🔏 HỆ THỐNG POPUP MODALS
           =================================================================== */}
 
       {/* MODAL 1: ĐĂNG NHẬP */}
@@ -1780,7 +1860,10 @@ function App() {
               <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                 <button
                   type="button"
-                  onClick={() => setActiveCrudTable(null)}
+                  onClick={() => {
+                    setActiveCrudTable(null);
+                    setClickCoords(null);
+                  }}
                   style={{
                     flex: 1,
                     padding: "8px",

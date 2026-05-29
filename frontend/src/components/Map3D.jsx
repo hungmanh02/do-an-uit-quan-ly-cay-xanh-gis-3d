@@ -7,16 +7,39 @@ const Map3D = forwardRef((props, ref) => {
   const viewRef = useRef(null);
   const layerKhuVucRef = useRef(null);
   const layerTuyenDuongRef = useRef(null);
-  const treeLayerRef = useRef(null);
 
+  // 🎯 CHÌA KHÓA: Khai báo Ref riêng biệt cho cả Thân và Tán để điều khiển làm tươi đồng thời
+  const treeTrunkRef = useRef(null);
+  const treeCrownRef = useRef(null);
+
+  // Xuất các hàm điều phối dòng đời ra App.jsx lề ngoài
   useImperativeHandle(ref, () => ({
     refreshLayers() {
+      console.log("🔄 [HỆ THỐNG GIS] Đang làm tươi đồng bộ toàn bộ các tầng dữ liệu không gian...");
+
+      // 1. Làm tươi lớp Ranh giới và Tuyến đường
       if (layerKhuVucRef.current && typeof layerKhuVucRef.current.refresh === "function")
         layerKhuVucRef.current.refresh();
       if (layerTuyenDuongRef.current && typeof layerTuyenDuongRef.current.refresh === "function")
         layerTuyenDuongRef.current.refresh();
-      if (treeLayerRef.current && typeof treeLayerRef.current.refresh === "function") treeLayerRef.current.refresh();
+
+      // 🎯 SỬA LỖI CHÍ MẠNG: Ép cả Thân cây và Tán lá nạp lại đồng thời
+      // Thêm cấu hình thời gian ngầm vào URL trước khi refresh để bẻ gãy cache của ArcGIS 4.25
+      const freshTimestamp = new Date().getTime();
+
+      if (treeTrunkRef.current) {
+        treeTrunkRef.current.url = `http://localhost:5000/api/map/cay-xanh?t=${freshTimestamp}`;
+        if (typeof treeTrunkRef.current.refresh === "function") treeTrunkRef.current.refresh();
+      }
+
+      if (treeCrownRef.current) {
+        treeCrownRef.current.url = `http://localhost:5000/api/map/cay-xanh?t=${freshTimestamp}`;
+        if (typeof treeCrownRef.current.refresh === "function") treeCrownRef.current.refresh();
+      }
+
+      console.log("🚀 [HỆ THỐNG GIS] Đã bẻ gãy cache đồ hoạ! Thân và Tán đã cập nhật dữ liệu mới!");
     },
+
     flyToCoordinates(lon, lat) {
       if (viewRef.current) {
         viewRef.current.goTo(
@@ -27,6 +50,16 @@ const Map3D = forwardRef((props, ref) => {
     },
   }));
 
+  // Hàm hỗ trợ làm tươi lớp tán lá phòng thủ
+  const treeCrownLayerKhongGianRefresh = () => {
+    if (treeCrownRef.current && typeof treeCrownRef.current.refresh === "function") {
+      treeCrownRef.current.refresh();
+    }
+  };
+
+  // ===================================================================
+  // 🛰️ EFFECT 1: KHỞI TẠO BẢN ĐỒ LÕI LẬP THỂ 3D (CHỈ CHẠY 1 LẦN DUY NHẤT)
+  // ===================================================================
   useEffect(() => {
     loadModules(
       [
@@ -89,9 +122,6 @@ const Map3D = forwardRef((props, ref) => {
           }),
         });
 
-        // ===================================================================
-        // 🌲 LỚP CÂY XANH 3D ĐỒNG KHỐI TRÒN TRỊA
-        // ===================================================================
         const treeApiUrl = `http://localhost:5000/api/map/cay-xanh?t=${currentTimestamp}`;
 
         const treeTrunkLayer = new GeoJSONLayer({
@@ -143,24 +173,23 @@ const Map3D = forwardRef((props, ref) => {
 
         view.when(() => {
           map.addMany([layerKhuVuc, layerTuyenDuong, treeTrunkLayer, treeCrownLayer]);
-          console.log("🌲 [HỆ THỐNG GIS] Đã nạp bản đồ cây xanh 3D!");
+          console.log("🌲 [HỆ THỐNG GIS] Đã kết nối quần thể 3D thông suốt!");
         });
 
         layerKhuVucRef.current = layerKhuVuc;
         layerTuyenDuongRef.current = layerTuyenDuong;
-        treeLayerRef.current = treeTrunkLayer;
 
-        // ===================================================================
-        // 🖱️ XỬ LÝ SỰ KIỆN CLICK: XEM THÔNG TIN HOẶC LẤY TỌA ĐỘ THÊM CÂY MỚI
-        // ===================================================================
+        // Đổ luồng vào hai Ref điều khiển độc lập
+        treeTrunkRef.current = treeTrunkLayer;
+        treeCrownRef.current = treeCrownLayer;
+
+        // CLICK MAP TƯƠNG TÁC THỰC ĐỊA
         view.on("click", (event) => {
           if (event.native) {
             if (typeof event.native.preventDefault === "function") event.native.preventDefault();
             if (typeof event.native.stopPropagation === "function") event.native.stopPropagation();
           }
-          if (event.stopPropagation) {
-            event.stopPropagation();
-          }
+          if (event.stopPropagation) event.stopPropagation();
 
           view.hitTest(event).then((response) => {
             const results = response.results;
@@ -168,14 +197,9 @@ const Map3D = forwardRef((props, ref) => {
               (r) => r.graphic && (r.graphic.layer === treeTrunkLayer || r.graphic.layer === treeCrownLayer)
             );
 
-            // Trường hợp 1: Click trúng cây có sẵn -> Hiện thông tin cây đó
             if (treeGraphic) {
               const attr = treeGraphic.graphic.attributes;
-
-              // Đóng form thêm cây mới lại nếu đang mở
-              if (props && typeof props.onMapClickPublic === "function") {
-                props.onMapClickPublic(null);
-              }
+              if (props && typeof props.onMapClickPublic === "function") props.onMapClickPublic(null);
 
               if (props && typeof props.onSelectTree === "function") {
                 props.onSelectTree({
@@ -189,27 +213,13 @@ const Map3D = forwardRef((props, ref) => {
                   lat: treeGraphic.graphic.geometry.latitude,
                 });
               }
-            }
-            // Trường hợp 2: Click ra khoảng trống lề đường -> Lấy tọa độ phục vụ Thêm cây mới
-            else {
-              // Reset bảng chi tiết cây cũ
-              if (props && typeof props.onSelectTree === "function") {
-                props.onSelectTree(null);
-              }
-
-              // Lấy chuẩn xác tọa độ kinh/vĩ độ nơi Admin vừa click
+            } else {
+              if (props && typeof props.onSelectTree === "function") props.onSelectTree(null);
               if (event.mapPoint) {
                 const longitude = event.mapPoint.longitude;
                 const latitude = event.mapPoint.latitude;
-
-                console.log(`🎯 Đã chấm tọa độ thực địa mới: Lon: ${longitude}, Lat: ${latitude}`);
-
-                // Bắn tọa độ ra cấu trúc App.jsx lề ngoài để mở Form Thêm Cây
                 if (props && typeof props.onMapClickPublic === "function") {
-                  props.onMapClickPublic({
-                    lon: longitude,
-                    lat: latitude,
-                  });
+                  props.onMapClickPublic({ lon: longitude, lat: latitude });
                 }
               }
             }
@@ -220,6 +230,64 @@ const Map3D = forwardRef((props, ref) => {
 
     return () => {};
   }, []);
+
+  // ===================================================================
+  // 🌟 EFFECT 2 (SỬA LỖI 1): ĐỒNG BỘ CHUYỂN MẠCH PHÂN KHU CAMERA ĐỘNG ĐOÀN HỆ
+  // ===================================================================
+  useEffect(() => {
+    // Chờ lõi đồ họa viewRef sẵn sàng hoàn toàn mới cho phép chuyển mạch phân khu
+    if (!viewRef.current || !layerKhuVucRef.current || !layerTuyenDuongRef.current) return;
+
+    const maKhuVuc = props.currentKhuVucId || "";
+    const timestamp = new Date().getTime();
+
+    if (maKhuVuc === "") {
+      // Đưa về góc nhìn rộng mặc định ban đầu
+      layerKhuVucRef.current.url = `http://localhost:5000/api/map/khu-vuc?t=${timestamp}`;
+      layerTuyenDuongRef.current.url = `http://localhost:5000/api/map/tuyen-duong?t=${timestamp}`;
+      layerKhuVucRef.current.refresh();
+      layerTuyenDuongRef.current.refresh();
+
+      viewRef.current
+        .goTo(
+          { center: [106.70371, 10.77402], zoom: 17, tilt: 45, heading: 0 },
+          { duration: 1500, easing: "in-out-cubic" }
+        )
+        .catch(() => {});
+      return;
+    }
+
+    // Nạp đường dẫn lọc động dữ liệu từ Postgres
+    layerKhuVucRef.current.url = `http://localhost:5000/api/map/khu-vuc?maKhuVuc=${maKhuVuc}&t=${timestamp}`;
+    layerTuyenDuongRef.current.url = `http://localhost:5000/api/map/tuyen-duong?maKhuVuc=${maKhuVuc}&t=${timestamp}`;
+
+    // Ép làm tươi đồ họa
+    layerKhuVucRef.current.refresh();
+    layerTuyenDuongRef.current.refresh();
+
+    // 🚀 CHÌA KHÓA KHƠI THÔNG CAMERA: Quét tọa độ tính toán lập tức bao quanh vùng đất mới
+    layerKhuVucRef.current.when(() => {
+      const query = layerKhuVucRef.current.createQuery();
+      layerKhuVucRef.current
+        .queryExtent(query)
+        .then((response) => {
+          if (response && response.extent) {
+            // Lao vọt camera chuẩn chỉnh đến bao quát phân khu trên DB
+            return viewRef.current.goTo(response.extent, {
+              duration: 1400,
+              easing: "in-out-cubic",
+            });
+          }
+        })
+        .then(() => {
+          // Nghiêng góc phối cảnh lập thể ngắm cây xanh 3D
+          return viewRef.current.goTo({ tilt: 52, heading: 325 }, { duration: 500 });
+        })
+        .catch((err) => {
+          if (err.name !== "AbortError") console.error("🔴 Lỗi tính toán định vị phân khu:", err);
+        });
+    });
+  }, [props.currentKhuVucId]); // Lắng nghe chuẩn xác sự kiện đổi Phân Khu lề ngoài
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
