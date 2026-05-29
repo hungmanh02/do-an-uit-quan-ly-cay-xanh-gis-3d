@@ -1,8 +1,9 @@
-import React, {useState, useEffect, useRef} from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Map3D from "./components/Map3D";
 import ExcelImporter from "./components/ExcelImporter";
 
 function App() {
+  const [clickCoords, setClickCoords] = useState(null); // Lưu { lon, lat } khi click map trống
   // ===================================================================
   // 🛰️ KHỐI MÃ SỰ KIỆN KHÔNG GIAN (REFS & LAYOUT SIDEBAR)
   // ===================================================================
@@ -14,6 +15,7 @@ function App() {
   // 🔐 PHÂN HỆ XÁC THỰC TÀI KHOẢN (BẢO MẬT HỆ THỐNG CÁN BỘ)
   // ===================================================================
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState(""); // "quan_ly" hoặc "nhan_vien"
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -21,38 +23,44 @@ function App() {
   // ===================================================================
   // 🌟 PHÂN HỆ ĐA KHU VỰC QUẢN LÝ (DYNAMIC ZONE FILTER)
   // ===================================================================
-  const [khuVucId, setKhuVucId] = useState(""); // "" có nghĩa là hiển thị toàn thành phố
+  const [khuVucId, setKhuVucId] = useState(""); // "" đại diện cho xem toàn thành phố
   const [danhSachKhuVuc, setDanhSachKhuVuc] = useState([]);
+
   // ===================================================================
-  // 🌲 PHÂN HỆ QUẢN TRỊ 1: LỚP BẢN ĐỒ CÂY XANH ĐÔ THỊ (POSTGRESQL)
+  // 🌲 PHÂN HỆ QUẢN TRỊ 1: LỚP BẢN ĐỒ CÂY XANH ĐÔ THỊ (ĐỒNG BỘ MACAYXANH)
   // ===================================================================
   const [isTreeMenuOpen, setIsTreeMenuOpen] = useState(false);
   const [showTreeListModal, setShowTreeListModal] = useState(false);
   const [allTrees, setAllTrees] = useState([]);
   const [selectedTree, setSelectedTree] = useState(null);
+
+  // 🌟 ĐÃ CẬP NHẬT: Cấu trúc form cây xanh ôm khít CSDL PostGIS mới
   const [treeFormData, setTreeFormData] = useState({
-    id: "",
-    loaiCay: "",
-    tinhTrang: "Khỏe mạnh",
-    chieuCao: "",
-    duongKinhTan: "",
-    lon: "",
-    lat: "",
+    MaCayXanh: "", // Khóa chính viết hoa đồng bộ bảng "CAY_XANH"
+    MaTuyenDuong: "1", // Khóa ngoại liên kết tuyến đường (Mặc định trục số 1)
+    loaiCay: "", // Thuộc tính Chủng loại (LoaiCay)
+    tinhTrang: "Khỏe mạnh", // Thuộc tính Sức khỏe sinh trưởng (TinhTrang)
+    chieuCao: "", // Thuộc tính Hình học không gian dọc (ChieuCao)
+    duongKinhTan: "", // Thuộc tính Hình học không gian ngang (DuongKinhTan)
+    lon: "", // Tọa độ phẳng Kinh độ trục X (lon)
+    lat: "", // Tọa độ phẳng Vĩ độ trục Y (lat)
   });
 
   // ===================================================================
-  // 🚨 PHÂN HỆ QUẢN TRỊ 2: LỚP BẢN ĐỒ SỰ CỐ HIỆN TRƯỜNG (FULL-CRUD)
+  // 🚨 PHÂN HỆ QUẢN TRỊ 2: LỚP BẢN ĐỒ SỰ CỐ HIỆN TRƯỜNG (ĐỒNG BỘ MASUCO)
   // ===================================================================
   const [isIncidentMenuOpen, setIsIncidentMenuOpen] = useState(false);
   const [showIncidentListModal, setShowIncidentListModal] = useState(false);
   const [suCoList, setSuCoList] = useState([]);
+
+  // 🌟 ĐÃ CẬP NHẬT: Cấu trúc form sự cố khớp với bảng "SU_CO" mới
   const [incidentFormData, setIncidentFormData] = useState({
-    id: "",
-    tieuDe: "",
-    moTa: "",
-    trangThai: "Chưa xử lý",
-    lon: "",
-    lat: "",
+    MaSuCo: "", // Khóa chính viết hoa đồng bộ bảng "SU_CO"
+    tieuDe: "", // Tiêu đề phân loại (tieuDe)
+    moTa: "", // Mô tả diễn biến thực địa (moTa)
+    trangThai: "Chưa xử lý", // Trạng thái vận hành (trangThai)
+    lon: "", // Tọa độ điểm sự cố trục X
+    lat: "", // Tọa độ điểm sự cố trục Y
   });
 
   // 🌐 KHỐI TIẾP NHẬN BÁO CÁO SỰ CỐ CÔNG CỘ PUBLIC (NGƯỜI DÂN CLICK MAP)
@@ -62,27 +70,31 @@ function App() {
   const [isSubmittingPublic, setIsSubmittingPublic] = useState(false);
 
   // ===================================================================
-  // 📅 PHÂN HỆ QUẢN TRỊ 3: SỔ SÁCH NHẬT KÝ CHĂM SÓC LIÊN KẾT
+  // 📅 PHÂN HỆ QUẢN TRỊ 3: SỔ SÁCH NHẬT KÝ CHĂM SÓC LIÊN KẾT (ĐỒNG BỘ MANHATKY)
   // ===================================================================
   const [isDiaryMenuOpen, setIsDiaryMenuOpen] = useState(false);
   const [showDiaryListModal, setShowDiaryListModal] = useState(false);
   const [allDiaries, setAllDiaries] = useState([]);
+
+  // 🌟 ĐÃ CẬP NHẬT: Cấu trúc form nhật ký khớp với bảng "NHAT_KY_CHAM_SOC" mới
   const [diaryFormData, setDiaryFormData] = useState({
-    id: "",
-    cayXanhId: "",
+    MaNhatKy: "", // Khóa chính viết hoa đồng bộ bảng
+    MaCayXanh: "", // Khóa ngoại trỏ thẳng đến mã cây xanh lập thể mới
     loaiCongViec: "Tưới nước",
     ngayThucHien: "",
     ghiChu: "",
   });
 
   // ===================================================================
-  // 🏢 PHÂN HỆ QUẢN TRỊ 4: DANH BẠ ĐƠN VỊ CÔNG TÁC PHỤ TRÁCH HẠ TẦNG
+  // 🏢 PHÂN HỆ QUẢN TRỊ 4: DANH BẠ ĐƠN VỊ CÔNG TÁC PHỤ TRÁCH HẠ TẦNG (ĐỒNG BỘ MADONVI)
   // ===================================================================
   const [isUnitMenuOpen, setIsUnitMenuOpen] = useState(false);
   const [showUnitListModal, setShowUnitListModal] = useState(false);
   const [allUnits, setAllUnits] = useState([]);
+
+  // 🌟 ĐÃ CẬP NHẬT: Cấu trúc form danh bạ đơn vị quản lý
   const [unitFormData, setUnitFormData] = useState({
-    id: "",
+    MaDonVi: "", // Khóa chính viết hoa đồng bộ bảng "DON_VI_QUAN_LY"
     tenDonVi: "",
     nguoiDaiDien: "",
     soDienThoai: "",
@@ -118,7 +130,7 @@ function App() {
       if (response.ok) {
         const geojson = await response.json();
         const listFromDB = geojson.features.map((feature) => ({
-          id: feature.properties.id,
+          id: feature.properties.id, // MaSuCo đã được Backend alias thành id
           loai: feature.properties.tieuDe,
           viTri: feature.properties.moTa,
           trangThai: feature.properties.trangThai || "Chưa xử lý",
@@ -132,23 +144,20 @@ function App() {
       console.error("🔴 Lỗi đồng bộ dữ liệu sự cố lề phải:", error);
     }
   };
+
   useEffect(() => {
     const fetchKhuVuc = async () => {
       try {
-        // Gọi lên API lấy khu vực (Mạnh kiểm tra lại đúng đường dẫn của Backend nhé)
         const res = await fetch("http://localhost:5000/api/map/khu-vuc");
         const data = await res.json();
 
-        // Nếu Backend trả thẳng về mảng GeoJSON dạng FeatureCollection
         if (data && data.features) {
           const list = data.features.map((f) => ({
-            id: f.properties.id, // Lấy ID phân khu
-            name: f.properties.TenKhuVuc, // Lấy Tên phân khu (hoặc tenKhuVuc tùy cách Backend đặt)
+            id: f.properties.id, // MaKhuVuc đã được Backend alias thành id
+            name: f.properties.TenKhuVuc,
           }));
           setDanhSachKhuVuc(list);
-        }
-        // Hoặc nếu Backend có 1 API riêng trả về mảng danh sách thuần túy
-        else if (Array.isArray(data)) {
+        } else if (Array.isArray(data)) {
           setDanhSachKhuVuc(data);
         }
       } catch (err) {
@@ -157,10 +166,11 @@ function App() {
     };
 
     fetchKhuVuc();
-  }, []); // Chạy 1 lần duy nhất khi load trang
+  }, []);
+
   useEffect(() => {
     fetchSuCoTuDB();
-    setSelectedTree(null); // Đóng Bottom bar đen khi đổi khu vực để tránh kẹt cache
+    setSelectedTree(null);
   }, [khuVucId]);
 
   // XỬ LÝ ĐĂNG NHẬP / ĐĂNG XUẤT
@@ -168,11 +178,14 @@ function App() {
     e.preventDefault();
     if (username === "admin" && password === "123456") {
       setIsLoggedIn(true);
+      setUserRole("quan_ly"); // Quản lý tối cao: Có toàn quyền CRUD + Import Excel
       setShowLoginModal(false);
-      setPublicCoords(null);
-      setUsername("");
-      setPassword("");
-      alert("🎉 Đăng nhập tài khoản Quản trị viên Sở thành công!");
+      alert("🎉 Đăng nhập quyền QUẢN LÝ thành công!");
+    } else if (username === "nhanvien" && password === "123456") {
+      setIsLoggedIn(true);
+      setUserRole("nhan_vien"); // Nhân viên: Chỉ có quyền xem, Đổi bước sự cố và ghi Nhật ký
+      setShowLoginModal(false);
+      alert("🎉 Đăng nhập quyền NHÂN VIÊN KỸ THUẬT thành công!");
     } else {
       alert("❌ Tài khoản hoặc mật khẩu không chính xác!");
     }
@@ -185,19 +198,36 @@ function App() {
     }
   };
 
-  // 🔨 THỰC THI THAO TÁC CRUD FORM ADMIND ĐỒNG BỘ POSTGRESQL
+  // 🔨 THỰC THI THAO TÁC CRUD FORM ADMIN ĐỒNG BỘ POSTGRESQL
   const handleAdminCrudSubmit = async (e) => {
     e.preventDefault();
+    console.log("🔍 [THÁM TỬ ADMIN] Đã kích hoạt nút submit form!");
+    console.log("🔍 [THÁM TỬ ADMIN] Phân hệ dữ liệu đang xử lý:", activeCrudTable);
+
     let url = "";
     let method = crudAction === "create" ? "POST" : "PUT";
     let bodyData = {};
 
     if (activeCrudTable === "cay_xanh") {
+      const currentMa = treeFormData.MaCayXanh || "";
       url =
         crudAction === "create"
           ? "http://localhost:5000/api/map/cay-xanh"
-          : `http://localhost:5000/api/map/cay-xanh/${treeFormData.id}`;
-      bodyData = treeFormData;
+          : `http://localhost:5000/api/map/cay-xanh/${currentMa}`;
+
+      // 🌟 ĐỒNG BỘ VÀ ÉP KIỂU SẠCH SẼ: Khớp 100% tên biến bóc tách ở mapRoutes Backend
+      bodyData = {
+        MaCayXanh: currentMa,
+        MaTuyenDuong: parseInt(treeFormData.MaTuyenDuong) || 1,
+        loaiCay: treeFormData.loaiCay,
+        tinhTrang: treeFormData.tinhTrang,
+        chieuCao: parseFloat(treeFormData.chieuCao) || 0,
+        duongKinhTan: parseFloat(treeFormData.duongKinhTan) || 0,
+        lon: parseFloat(treeFormData.lon) || 0,
+        lat: parseFloat(treeFormData.lat) || 0,
+      };
+
+      console.log("📡 [THÁM TỬ ADMIN] Gói JSON chuẩn bị đẩy lên API:", bodyData);
     } else if (activeCrudTable === "nhat_ky") {
       url =
         crudAction === "create"
@@ -212,28 +242,39 @@ function App() {
       bodyData = unitFormData;
     }
 
+    if (!url) {
+      console.log("❌ [HỦY TIẾN TRÌNH] URL API trống rỗng!");
+      return;
+    }
+
     try {
       const response = await fetch(url, {
         method: method,
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bodyData),
       });
+
+      const resData = await response.json();
+
       if (response.ok) {
         alert("🎉 Thao tác cơ sở dữ liệu thành công!");
         setActiveCrudTable(null);
         fetchSuCoTuDB();
         if (map3DRef.current) map3DRef.current.refreshLayers();
+      } else {
+        alert(`❌ Thao tác thất bại: ${resData.message || "Lỗi không xác định"}`);
       }
     } catch (err) {
+      console.error("🔴 Lỗi chí mạng trong khối fetch lệnh CRUD:", err);
       alert("🔴 Thao tác thất bại do mất kết nối dữ liệu!");
     }
   };
 
-  // 🗑️ THAO TÁC ADMIND: Xóa cây xanh trực tiếp từ nút trên thanh Bottom Bar đen
+  // 🗑️ THAO TÁC ADMIN: Xóa cây xanh trực tiếp từ nút trên thanh Bottom Bar đen
   const handleAdminDeleteTree = async (treeId) => {
     if (!window.confirm(`⚠️ Cán bộ có chắc chắn muốn xóa vĩnh viễn cây #${treeId} khỏi PostGIS?`)) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/map/cay-xanh/${treeId}`, {method: "DELETE"});
+      const response = await fetch(`http://localhost:5000/api/map/cay-xanh/${treeId}`, { method: "DELETE" });
       if (response.ok) {
         alert("🗑️ Hệ thống đã giải phóng và xóa thực thể cây xanh thành công!");
         setSelectedTree(null);
@@ -255,8 +296,8 @@ function App() {
     try {
       const response = await fetch(`http://localhost:5000/api/map/su-co/${id}`, {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({trang_thai: nextStatus}),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trang_thai: nextStatus }),
       });
       if (response.ok) {
         fetchSuCoTuDB();
@@ -271,7 +312,7 @@ function App() {
     e.stopPropagation();
     if (!window.confirm(`⚠️ Bạn có chắc chắn muốn xóa vĩnh viễn sự cố #${id}?`)) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/map/su-co/${id}`, {method: "DELETE"});
+      const response = await fetch(`http://localhost:5000/api/map/su-co/${id}`, { method: "DELETE" });
       if (response.ok) {
         alert("🗑️ Đã xóa thực thể sự cố!");
         fetchSuCoTuDB();
@@ -289,7 +330,7 @@ function App() {
     try {
       const response = await fetch("http://localhost:5000/api/map/su-co", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tieu_de: tieuDePublic,
           mo_ta: moTaPublic,
@@ -331,7 +372,7 @@ function App() {
           =================================================================== */}
       <div
         style={{
-          width: showLeftSidebar ? "320px" : "70px",
+          width: showLeftSidebar ? "320px" : "60px",
           height: "100vh",
           background: "#1e293b",
           borderRight: "1px solid #334155",
@@ -347,18 +388,16 @@ function App() {
       >
         {showLeftSidebar ? (
           <>
-            {/* TIÊU ĐỀ SIDEBAR & Ô CHỌN PHÂN KHU ĐỘNG */}
-            <div style={{flexShrink: 0, paddingBottom: "12px", borderBottom: "1px solid #334155"}}>
-              <div style={{fontSize: "10px", color: "#34d399", fontWeight: "bold", letterSpacing: "1px"}}>
+            <div style={{ flexShrink: 0, paddingBottom: "12px", borderBottom: "1px solid #334155" }}>
+              <div style={{ fontSize: "10px", color: "#34d399", fontWeight: "bold", letterSpacing: "1px" }}>
                 SỞ TÀI NGUYÊN VÀ MÔ TRƯỜNG TP.HCM
               </div>
-              <h1 style={{fontSize: "16px", color: "#fff", margin: "4px 0", fontWeight: "800"}}>
+              <h1 style={{ fontSize: "16px", color: "#fff", margin: "4px 0", fontWeight: "800" }}>
                 {isLoggedIn ? "Trung Tâm Quản Trị CSDL" : "Cổng Thông Tin Công Cộng"}
               </h1>
 
-              {/* Ô CHỌN PHÂN KHU KHÔNG GIAN ĐỘNG - PHÂN CẤP TỪ TP.HCM XUỐNG DỮ LIỆU ĐỘNG DATABASE */}
-              <div style={{marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{fontSize: "11px", color: "#38bdf8", fontWeight: "bold"}}>
+              <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "bold" }}>
                   🏢 Chọn phân khu không gian:
                 </label>
                 <select
@@ -376,13 +415,10 @@ function App() {
                     outline: "none",
                   }}
                 >
-                  {/* 🌟 SỬA DÒNG NÀY: Mặc định rỗng là ôm trọn góc nhìn toàn bộ TP.HCM từ trên cao */}
                   <option value="">🌐 Toàn bộ TP.HCM (Xem tổng quan)</option>
-                  {/* Vòng lặp map tự động lấy dữ liệu thực tế từ Database (Nguyễn Huệ, Tao Đàn, 23/9...) */}
                   {danhSachKhuVuc &&
                     Array.isArray(danhSachKhuVuc) &&
                     danhSachKhuVuc.map((kv) => {
-                      // Bỏ qua hoặc gán key mặc định nếu bản ghi bị lỗi ID trống
                       const optionId = kv.id || kv.MaKhuVuc || Math.random();
                       return (
                         <option key={optionId} value={kv.id}>
@@ -394,7 +430,6 @@ function App() {
               </div>
             </div>
 
-            {/* THÂN SIDEBAR - CUỘN TRÒN THÔNG MINH */}
             <div
               style={{
                 flex: 1,
@@ -406,12 +441,33 @@ function App() {
               }}
             >
               {isLoggedIn ? (
-                <div style={{display: "flex", flexDirection: "column", gap: "10px"}}>
-                  <h4 style={{color: "#38bdf8", fontSize: "11px", margin: "2px 0", fontWeight: "bold"}}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {/* 👑 KHỐI HIỂN THỊ THÔNG TIN VAI TRÒ */}
+                  <div
+                    style={{
+                      padding: "8px 12px",
+                      backgroundColor: userRole === "quan_ly" ? "rgba(16, 185, 129, 0.15)" : "rgba(59, 130, 246, 0.15)",
+                      border: `1px solid ${userRole === "quan_ly" ? "#10b981" : "#3b82f6"}`,
+                      borderRadius: "8px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: userRole === "quan_ly" ? "#10b981" : "#3b82f6",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {userRole === "quan_ly" ? "👑 VAI TRÒ: QUẢN LÝ SỞ (TOÀN QUỀN)" : "🛠️ VAI TRÒ: NHÂN VIÊN THỰC ĐỊA"}
+                    </span>
+                  </div>
+
+                  <h4 style={{ color: "#38bdf8", fontSize: "11px", margin: "2px 0", fontWeight: "bold" }}>
                     🗂️ DANH MỤC BẢNG DỮ LIỆU CHUYÊN NGÀNH
                   </h4>
 
-                  {/* 1. SUBMENU BẢNG CÂY XANH */}
+                  {/* 🌲 1. PHÂN HỆ CÂY XANH ĐÔ THỊ */}
                   <div
                     style={{
                       display: "flex",
@@ -433,7 +489,7 @@ function App() {
                         backgroundColor: isTreeMenuOpen ? "#1e293b" : "transparent",
                       }}
                     >
-                      <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
+                      <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold" }}>
                         🌲 1. Bảng Cây Xanh Đô Thị
                       </span>
                       <span
@@ -447,6 +503,7 @@ function App() {
                         ▼
                       </span>
                     </div>
+
                     {isTreeMenuOpen && (
                       <div
                         style={{
@@ -458,39 +515,42 @@ function App() {
                           gap: "6px",
                         }}
                       >
+                        {/* 🌟 Chỉ QUẢN LÝ mới nhìn thấy nút Thêm mới đơn lẻ (POST) */}
+                        {userRole === "quan_ly" && (
+                          <button
+                            onClick={() => {
+                              setCrudAction("create");
+                              setTreeFormData({
+                                MaCayXanh: "",
+                                MaTuyenDuong: khuVucId || "1",
+                                loaiCay: "",
+                                tinhTrang: "Khỏe mạnh",
+                                chieuCao: "",
+                                duongKinhTan: "",
+                                lon: "",
+                                lat: "",
+                              });
+                              setActiveCrudTable("cay_xanh");
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              backgroundColor: "#1e293b",
+                              border: "1px solid #334155",
+                              color: "#10b981",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              textAlign: "left",
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            ➕ Thêm mới cây xanh lập thể (POST)
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => {
-                            setCrudAction("create");
-                            setTreeFormData({
-                              id: "",
-                              loaiCay: "",
-                              tinhTrang: "Khỏe mạnh",
-                              chieuCao: "",
-                              duongKinhTan: "",
-                              lon: "",
-                              lat: "",
-                            });
-                            setActiveCrudTable("cay_xanh");
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            backgroundColor: "#1e293b",
-                            border: "1px solid #334155",
-                            color: "#10b981",
-                            borderRadius: "6px",
-                            fontSize: "11px",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          ➕ Thêm mới cây xanh lập thể
-                        </button>
-                        <button
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
+                          onClick={async () => {
                             try {
                               const url = khuVucId
                                 ? `http://localhost:5000/api/map/cay-xanh?maKhuVuc=${khuVucId}`
@@ -498,16 +558,18 @@ function App() {
                               const res = await fetch(url);
                               if (res.ok) {
                                 const geojson = await res.json();
-                                const listTreesFromDB = geojson.features.map((feature) => ({
-                                  id: feature.properties.id,
-                                  loaiCay: feature.properties.loaiCay,
-                                  tinhTrang: feature.properties.tinhTrang || "Khỏe mạnh",
-                                  chieuCao: feature.properties.chieuCao || 0,
-                                  duongKinhTan: feature.properties.duongKinhTan || 0,
-                                  lon: feature.geometry?.coordinates?.[0] || 0,
-                                  lat: feature.geometry?.coordinates?.[1] || 0,
-                                }));
-                                setAllTrees(listTreesFromDB);
+                                setAllTrees(
+                                  geojson.features.map((f) => ({
+                                    id: f.properties.id,
+                                    maTuyenDuong: f.properties.maTuyenDuong,
+                                    loaiCay: f.properties.loaiCay,
+                                    tinhTrang: f.properties.tinhTrang || "Khỏe mạnh",
+                                    chieuCao: f.properties.chieuCao || 0,
+                                    duongKinhTan: f.properties.duongKinhTan || 0,
+                                    lon: f.geometry?.coordinates?.[0] || 0,
+                                    lat: f.geometry?.coordinates?.[1] || 0,
+                                  }))
+                                );
                                 setShowTreeListModal(true);
                               }
                             } catch (err) {
@@ -527,13 +589,13 @@ function App() {
                             fontWeight: "bold",
                           }}
                         >
-                          📋 Xem danh sách thuộc tính cây
+                          📋 Xem thuộc tính & Sửa/Xóa cây (GET/PUT/DELETE)
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* 2. SUBMENU BẢNG SỰ CỐ */}
+                  {/* 🚨 2. PHÂN HỆ ĐIỀU PHỐI SỰ CỐ HIỆN TRƯỜNG */}
                   <div
                     style={{
                       display: "flex",
@@ -555,8 +617,8 @@ function App() {
                         backgroundColor: isIncidentMenuOpen ? "#1e293b" : "transparent",
                       }}
                     >
-                      <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
-                        🚨 2. Bảng Sự Cố Hiện Trường
+                      <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold" }}>
+                        🚨 2. Bản Đồ Sự Cố Hiện Trường
                       </span>
                       <span
                         style={{
@@ -598,13 +660,16 @@ function App() {
                             fontWeight: "bold",
                           }}
                         >
-                          📋 Quản lý danh sách sự cố khẩn cấp
+                          📋{" "}
+                          {userRole === "quan_ly"
+                            ? "Quản lý & Duyệt hủy sự cố (FULL CRUD)"
+                            : "⚡ Tiếp nhận & Đổi bước sự cố"}
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* 3. SUBMENU NHẬT KÝ CHĂM SÓC */}
+                  {/* 📅 3. PHÂN HỆ SỔ SÁCH NHẬT KÝ CÔNG VỤ */}
                   <div
                     style={{
                       display: "flex",
@@ -626,7 +691,9 @@ function App() {
                         backgroundColor: isDiaryMenuOpen ? "#1e293b" : "transparent",
                       }}
                     >
-                      <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>📅 3. Nhật Ký Chăm Sóc</span>
+                      <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold" }}>
+                        📅 3. Nhật Ký Chăm Sóc Cây
+                      </span>
                       <span
                         style={{
                           color: "#94a3b8",
@@ -649,6 +716,7 @@ function App() {
                           gap: "6px",
                         }}
                       >
+                        {/* Cả Quản lý và Nhân viên đều ghi được Nhật ký (POST) */}
                         <button
                           onClick={() => {
                             setCrudAction("create");
@@ -674,7 +742,7 @@ function App() {
                             fontWeight: "bold",
                           }}
                         >
-                          ➕ Ghi sổ nhật ký công việc
+                          ➕ Ghi sổ nhật ký tác nghiệp mới (POST)
                         </button>
                         <button
                           onClick={async () => {
@@ -702,13 +770,13 @@ function App() {
                             fontWeight: "bold",
                           }}
                         >
-                          📋 Xem sổ sách nhật ký liên kết
+                          📋 Tra cứu lịch sử sổ sách (GET/DELETE)
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* 4. SUBMENU ĐƠN VỊ QUẢN LÝ */}
+                  {/* 🏢 4. PHÂN HỆ DANH BẠ ĐƠN VỊ LIÊN KẾT */}
                   <div
                     style={{
                       display: "flex",
@@ -730,7 +798,7 @@ function App() {
                         backgroundColor: isUnitMenuOpen ? "#1e293b" : "transparent",
                       }}
                     >
-                      <span style={{color: "#fff", fontSize: "12px", fontWeight: "bold"}}>
+                      <span style={{ color: "#fff", fontSize: "12px", fontWeight: "bold" }}>
                         🏢 4. Đơn Vị Quản Lý Hạ Tầng
                       </span>
                       <span
@@ -755,33 +823,35 @@ function App() {
                           gap: "6px",
                         }}
                       >
-                        <button
-                          onClick={() => {
-                            setCrudAction("create");
-                            setUnitFormData({
-                              id: "",
-                              tenDonVi: "",
-                              nguoiDaiDien: "",
-                              soDienThoai: "",
-                              khuVucPhuTrach: "Quận 1",
-                            });
-                            setActiveCrudTable("don_vi");
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            backgroundColor: "#1e293b",
-                            border: "1px solid #334155",
-                            color: "#10b981",
-                            borderRadius: "6px",
-                            fontSize: "11px",
-                            textAlign: "left",
-                            cursor: "pointer",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          ➕ Thêm cơ sở đơn vị quản lý
-                        </button>
+                        {userRole === "quan_ly" && (
+                          <button
+                            onClick={() => {
+                              setCrudAction("create");
+                              setUnitFormData({
+                                id: "",
+                                tenDonVi: "",
+                                nguoiDaiDien: "",
+                                soDienThoai: "",
+                                khuVucPhuTrach: "Quận 1",
+                              });
+                              setActiveCrudTable("don_vi");
+                            }}
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              backgroundColor: "#1e293b",
+                              border: "1px solid #334155",
+                              color: "#10b981",
+                              borderRadius: "6px",
+                              fontSize: "11px",
+                              textAlign: "left",
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            ➕ Thêm cơ sở đơn vị mới (POST)
+                          </button>
+                        )}
                         <button
                           onClick={async () => {
                             try {
@@ -808,15 +878,20 @@ function App() {
                             fontWeight: "bold",
                           }}
                         >
-                          📋 Tra cứu thông tin danh bạ đơn vị
+                          📋 Tra cứu danh bạ đơn vị (GET)
                         </button>
                       </div>
                     )}
                   </div>
-                  <ExcelImporter onImportSuccess={() => map3DRef.current?.refreshLayers()} />
+
+                  {/* 🟩 5. TÍNH NĂNG IMPORT TIỆN ÍCH EXCEL (CHỈ QUẢN LÝ CÓ QUỀN) */}
+                  {userRole === "quan_ly" && (
+                    <div style={{ marginTop: "4px" }}>
+                      <ExcelImporter onImportSuccess={() => map3DRef.current?.refreshLayers()} />
+                    </div>
+                  )}
                 </div>
               ) : (
-                /* NẾU LÀ NGƯỜI DÂN CÔNG CỘNG: Hiện Form phản ánh */
                 <>
                   {!publicCoords ? (
                     <div
@@ -846,22 +921,22 @@ function App() {
                         gap: "10px",
                       }}
                     >
-                      <h3 style={{color: "#ef4444", fontSize: "12px", margin: 0, fontWeight: "bold"}}>
+                      <h3 style={{ color: "#ef4444", fontSize: "12px", margin: 0, fontWeight: "bold" }}>
                         🚨 GỬI PHẢN ÁNH SỰ CỐ THỰC ĐỊA
                       </h3>
                       <form
                         onSubmit={handlePublicReportSubmit}
-                        style={{display: "flex", flexDirection: "column", gap: "8px", fontSize: "11px"}}
+                        style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "11px" }}
                       >
                         <div>
-                          <span style={{color: "#94a3b8"}}>Tọa độ gốc thân cây:</span>
-                          <div style={{color: "#38bdf8", fontWeight: "bold", marginTop: "2px"}}>
+                          <span style={{ color: "#94a3b8" }}>Tọa độ gốc thân cây:</span>
+                          <div style={{ color: "#38bdf8", fontWeight: "bold", marginTop: "2px" }}>
                             X: {publicCoords?.lon ? parseFloat(publicCoords.lon).toFixed(6) : "0.000000"}, Y:{" "}
                             {publicCoords?.lat ? parseFloat(publicCoords.lat).toFixed(6) : "0.000000"}
                           </div>
                         </div>
-                        <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                          <label style={{color: "#cbd5e1"}}>Loại sự cố:</label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <label style={{ color: "#cbd5e1" }}>Loại sự cố:</label>
                           <select
                             value={tieuDePublic}
                             onChange={(e) => setTieuDePublic(e.target.value)}
@@ -880,8 +955,8 @@ function App() {
                             <option value="Sâu bệnh/Héo úa">🐛 Cây mục rỗng gốc hiểm họa</option>
                           </select>
                         </div>
-                        <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                          <label style={{color: "#cbd5e1"}}>Mô tả chi tiết:</label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                          <label style={{ color: "#cbd5e1" }}>Mô tả chi tiết:</label>
                           <textarea
                             rows="2"
                             placeholder="Nhập diễn biến hiện trường..."
@@ -898,7 +973,7 @@ function App() {
                             }}
                           />
                         </div>
-                        <div style={{display: "flex", gap: "8px", marginTop: "4px"}}>
+                        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                           <button
                             type="button"
                             onClick={() => setPublicCoords(null)}
@@ -938,7 +1013,7 @@ function App() {
                 </>
               )}
 
-              {/* KHỐI BIỂU ĐỒ LỚP PHỦ THỐNG KÊ (GIỮ NGUYÊN) */}
+              {/* KHỐI BIỂU ĐỒ LỚP PHỦ THỐNG KÊ */}
               <div
                 style={{
                   background: "#0f172a",
@@ -951,33 +1026,36 @@ function App() {
                 }}
               >
                 <div>
-                  <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
+                  <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>
                     🟢 Lớp phủ cây xanh khỏe mạnh: <b>85%</b>
                   </div>
-                  <div style={{width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px"}}>
-                    <div style={{width: "85%", height: "100%", backgroundColor: "#10b981", borderRadius: "3px"}}></div>
+                  <div style={{ width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px" }}>
+                    <div
+                      style={{ width: "85%", height: "100%", backgroundColor: "#10b981", borderRadius: "3px" }}
+                    ></div>
                   </div>
                 </div>
                 <div>
-                  <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
+                  <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>
                     🟡 Lớp phủ cây xanh cần chăm sóc: <b>10%</b>
                   </div>
-                  <div style={{width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px"}}>
-                    <div style={{width: "10%", height: "100%", backgroundColor: "#f59e0b", borderRadius: "3px"}}></div>
+                  <div style={{ width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px" }}>
+                    <div
+                      style={{ width: "10%", height: "100%", backgroundColor: "#f59e0b", borderRadius: "3px" }}
+                    ></div>
                   </div>
                 </div>
                 <div>
-                  <div style={{fontSize: "11px", color: "#cbd5e1", marginBottom: "4px"}}>
+                  <div style={{ fontSize: "11px", color: "#cbd5e1", marginBottom: "4px" }}>
                     🔴 Lớp phủ cây xanh sâu bệnh: <b>5%</b>
                   </div>
-                  <div style={{width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px"}}>
-                    <div style={{width: "5%", height: "100%", backgroundColor: "#ef4444", borderRadius: "3px"}}></div>
+                  <div style={{ width: "100%", height: "5px", backgroundColor: "#334155", borderRadius: "3px" }}>
+                    <div style={{ width: "5%", height: "100%", backgroundColor: "#ef4444", borderRadius: "3px" }}></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* FOOTER SIDEBAR TRÁI */}
             <div
               style={{
                 flexShrink: 0,
@@ -1008,7 +1086,7 @@ function App() {
                     borderRadius: "50%",
                   }}
                 ></span>
-                ĐÃ KẾT NỐI HỆ THỐNG POSTGIS
+                ĐÃ KẾT NỐI HỆ THỐNG POSTGIS
               </div>
               {isLoggedIn ? (
                 <button
@@ -1050,7 +1128,7 @@ function App() {
             </div>
           </>
         ) : (
-          <div style={{fontSize: "20px"}}>📊</div>
+          <div style={{ fontSize: "20px" }}>📊</div>
         )}
       </div>
 
@@ -1080,7 +1158,7 @@ function App() {
       {/* ===================================================================
           KHU VỰC TRUNG TÂM: BẢN ĐỒ 3D ARCGIS VÀ THANH BOTTOM BAR ĐEN
           =================================================================== */}
-      <div style={{flex: 1, height: "100vh", position: "relative"}}>
+      <div style={{ flex: 1, height: "100vh", position: "relative" }}>
         <Map3D
           ref={map3DRef}
           currentKhuVucId={khuVucId}
@@ -1088,7 +1166,7 @@ function App() {
           onReportSuccess={fetchSuCoTuDB}
           onMapClickPublic={(coords) => {
             if (!isLoggedIn && coords) {
-              setPublicCoords({lon: coords.lon, lat: coords.lat});
+              setPublicCoords({ lon: coords.lon, lat: coords.lat });
               setShowLeftSidebar(true);
             }
           }}
@@ -1116,14 +1194,16 @@ function App() {
               gap: "40px",
             }}
           >
-            <div style={{display: "flex", alignItems: "center", gap: "28px", flex: 1, minWidth: 0}}>
-              <div style={{display: "flex", alignItems: "center", gap: "12px", flexShrink: 0}}>
-                <span style={{fontSize: "22px"}}>🌲</span>
-                <div style={{display: "flex", flexDirection: "column", gap: "2px"}}>
-                  <h3 style={{margin: 0, fontSize: "15px", color: "#10b981", fontWeight: "bold", whiteSpace: "nowrap"}}>
+            <div style={{ display: "flex", alignItems: "center", gap: "28px", flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+                <span style={{ fontSize: "22px" }}>🌲</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                  <h3
+                    style={{ margin: 0, fontSize: "15px", color: "#10b981", fontWeight: "bold", whiteSpace: "nowrap" }}
+                  >
                     {selectedTree.loaiCay}
                   </h3>
-                  <span style={{fontSize: "11px", color: "#64748b", fontFamily: "monospace"}}>
+                  <span style={{ fontSize: "11px", color: "#64748b", fontFamily: "monospace" }}>
                     ID: #{selectedTree.id}
                   </span>
                 </div>
@@ -1138,20 +1218,20 @@ function App() {
                   flexWrap: "nowrap",
                 }}
               >
-                <span style={{whiteSpace: "nowrap"}}>
-                  📐 Đường kính tán: <b style={{color: "#fff"}}>{selectedTree.duongKinhTan} m</b>
+                <span style={{ whiteSpace: "nowrap" }}>
+                  📐 Đường kính tán: <b style={{ color: "#fff" }}>{selectedTree.duongKinhTan} m</b>
                 </span>
-                <span style={{whiteSpace: "nowrap"}}>
-                  📏 Chiều cao thực tế: <b style={{color: "#fff"}}>{selectedTree.chieuCao} m</b>
+                <span style={{ whiteSpace: "nowrap" }}>
+                  📏 Chiều cao thực tế: <b style={{ color: "#fff" }}>{selectedTree.chieuCao} m</b>
                 </span>
-                <span style={{whiteSpace: "nowrap"}}>
-                  ❤️ Sức khỏe: <b style={{color: "#38bdf8"}}>{selectedTree.tinhTrang}</b>
+                <span style={{ whiteSpace: "nowrap" }}>
+                  ❤️ Sức khỏe: <b style={{ color: "#38bdf8" }}>{selectedTree.tinhTrang}</b>
                 </span>
               </div>
             </div>
 
-            <div style={{display: "flex", alignItems: "center", gap: "16px", flexShrink: 0}}>
-              <div style={{display: "flex", flexDirection: "column", gap: "6px", width: "190px", flexShrink: 0}}>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "190px", flexShrink: 0 }}>
                 {isLoggedIn ? (
                   <>
                     <button
@@ -1161,7 +1241,7 @@ function App() {
                         setActiveCrudTable("su_co");
                         setCrudAction("create");
                         setIncidentFormData({
-                          id: "",
+                          MaSuCo: "",
                           tieuDe: `Sự cố cây #${selectedTree?.id} (${selectedTree?.loaiCay})`,
                           moTa: `Ghi nhận tình trạng: ${selectedTree?.tinhTrang}. Cần xử lý gấp.`,
                           trangThai: "Chưa xử lý",
@@ -1187,12 +1267,13 @@ function App() {
                     >
                       ⚠️ Báo cáo sự cố
                     </button>
-                    <div style={{display: "flex", gap: "6px", width: "100%"}}>
+                    <div style={{ display: "flex", gap: "6px", width: "100%" }}>
                       <button
                         onClick={() => {
                           setCrudAction("update");
                           setTreeFormData({
-                            id: selectedTree.id,
+                            MaCayXanh: selectedTree.id, // ID bốc từ ArcGIS gán vào khóa chính MaCayXanh Form
+                            MaTuyenDuong: selectedTree.maTuyenDuong || "1",
                             loaiCay: selectedTree.loaiCay,
                             tinhTrang: selectedTree.tinhTrang,
                             chieuCao: selectedTree.chieuCao,
@@ -1239,10 +1320,10 @@ function App() {
                 ) : (
                   <button
                     onClick={() => {
-                      setPublicCoords({lon: selectedTree.lon, lat: selectedTree.lat});
+                      setPublicCoords({ lon: selectedTree.lon, lat: selectedTree.lat });
                       setTieuDePublic("");
                       setMoTaPublic(
-                        `Phản ánh sự cố cho cây mã số #${selectedTree.id} (${selectedTree.loaiCay}) vỉa hè.`,
+                        `Phản ánh sự cố cho cây mã số #${selectedTree.id} (${selectedTree.loaiCay}) vỉa hè.`
                       );
                       setShowLeftSidebar(true);
                     }}
@@ -1325,15 +1406,15 @@ function App() {
           overflow: "hidden",
         }}
       >
-        <h3 style={{color: "#38bdf8", fontSize: "13px", margin: 0, fontWeight: "bold"}}>
+        <h3 style={{ color: "#38bdf8", fontSize: "13px", margin: 0, fontWeight: "bold" }}>
           🚨 TRUNG TÂM TIẾP NHẬN SỰ CỐ
         </h3>
-        <p style={{fontSize: "11px", color: "#94a3b8", margin: 0}}>
+        <p style={{ fontSize: "11px", color: "#94a3b8", margin: 0 }}>
           {isLoggedIn
             ? "Bảng điều phối và xử lý hạ tầng (Admin):"
             : "Danh sách sự cố đang được cơ quan xử lý công khai:"}
         </p>
-        <div style={{flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px"}}>
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px" }}>
           {suCoList.map((sc) => (
             <div
               key={sc.id}
@@ -1349,18 +1430,18 @@ function App() {
                 cursor: "pointer",
               }}
             >
-              <div style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-                <span style={{fontSize: "12px", color: "#fff", fontWeight: "bold"}}>{sc.loai}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: "#fff", fontWeight: "bold" }}>{sc.loai}</span>
                 {isLoggedIn && (
                   <button
                     onClick={(e) => handleDeleteSuCo(e, sc.id)}
-                    style={{background: "none", border: "none", color: "#ef4444", cursor: "pointer"}}
+                    style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}
                   >
                     🗑️
                   </button>
                 )}
               </div>
-              <div style={{fontSize: "11px", color: "#94a3b8"}}>📍 Diễn biến: {sc.viTri}</div>
+              <div style={{ fontSize: "11px", color: "#94a3b8" }}>📍 Diễn biến: {sc.viTri}</div>
               <div
                 style={{
                   display: "flex",
@@ -1371,7 +1452,7 @@ function App() {
                   borderTop: "1px solid #1e293b",
                 }}
               >
-                <span style={{fontSize: "10px", color: sc.color}}>
+                <span style={{ fontSize: "10px", color: sc.color }}>
                   ● {!isLoggedIn && sc.trangThai === "Chưa xử lý" ? "Đang được tiếp nhận và khắc phục" : sc.trangThai}
                 </span>
                 {isLoggedIn && sc.trangThai !== "Đã hoàn thành" && (
@@ -1459,7 +1540,7 @@ function App() {
             </h2>
             <form
               onSubmit={handleLoginSubmit}
-              style={{display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px"}}
+              style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px" }}
             >
               <input
                 type="text"
@@ -1509,7 +1590,7 @@ function App() {
         </div>
       )}
 
-      {/* MODAL 2: FORM THÊM/SỬA CÂY */}
+      {/* MODAL 2: FORM THÊM/SỬA CÂY XANH ĐÔ THỊ ĐA PHÂN KHU CHUẨN ĐÉT */}
       {activeCrudTable === "cay_xanh" && (
         <div
           style={{
@@ -1546,20 +1627,45 @@ function App() {
               }}
             >
               🌲{" "}
-              {crudAction === "create" ? "Thêm mới thực thể không gian" : `Cập nhật thuộc tính cây #${treeFormData.id}`}
+              {crudAction === "create"
+                ? "Thêm mới thực thể không gian"
+                : `Cập nhật thuộc tính cây #${treeFormData.MaCayXanh}`}
             </h2>
             <form
               onSubmit={handleAdminCrudSubmit}
-              style={{display: "flex", flexDirection: "column", gap: "10px", fontSize: "11px"}}
+              style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "11px" }}
             >
-              <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{color: "#94a3b8"}}>Chủng loại cây xanh:</label>
+              {/* CHỌN TUYẾN ĐƯỜNG ĐỂ LIÊN KẾT KHÓA NGOẠI POSTGRESQL */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Tuyến đường thuộc quản lý:</label>
+                <select
+                  value={treeFormData.MaTuyenDuong}
+                  onChange={(e) => setTreeFormData({ ...treeFormData, MaTuyenDuong: parseInt(e.target.value) })}
+                  style={{
+                    padding: "7px",
+                    backgroundColor: "#0f172a",
+                    border: "1px solid #475569",
+                    color: "#fff",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  <option value="1">Trục chính Nguyễn Huệ (Quận 1)</option>
+                  <option value="2">Đường Trương Định (Tao Đàn)</option>
+                  <option value="3">Trục đi bộ Công viên 23 Tháng 9</option>
+                </select>
+              </div>
+
+              {/* CHỦNG LOẠI CÂY */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Chủng loại cây xanh:</label>
                 <input
                   type="text"
                   placeholder="Ví dụ: Cây Sao Đen, Dầu Rái..."
                   required
                   value={treeFormData.loaiCay}
-                  onChange={(e) => setTreeFormData({...treeFormData, loaiCay: e.target.value})}
+                  onChange={(e) => setTreeFormData({ ...treeFormData, loaiCay: e.target.value })}
                   style={{
                     padding: "7px",
                     backgroundColor: "#0f172a",
@@ -1569,16 +1675,18 @@ function App() {
                   }}
                 />
               </div>
-              <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px"}}>
-                <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                  <label style={{color: "#94a3b8"}}>Chiều cao (m):</label>
+
+              {/* LƯỚI HAI CỘT: CHIỀU CAO VÀ ĐƯỜNG KÍNH TÁN */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ color: "#94a3b8" }}>Chiều cao (m):</label>
                   <input
                     type="number"
                     step="0.1"
                     placeholder="15.5"
                     required
                     value={treeFormData.chieuCao}
-                    onChange={(e) => setTreeFormData({...treeFormData, chieuCao: e.target.value})}
+                    onChange={(e) => setTreeFormData({ ...treeFormData, chieuCao: e.target.value })}
                     style={{
                       padding: "7px",
                       backgroundColor: "#0f172a",
@@ -1588,15 +1696,15 @@ function App() {
                     }}
                   />
                 </div>
-                <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                  <label style={{color: "#94a3b8"}}>Đường kính tán (m):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ color: "#94a3b8" }}>Đường kính tán (m):</label>
                   <input
                     type="number"
                     step="0.1"
                     placeholder="4.5"
                     required
                     value={treeFormData.duongKinhTan}
-                    onChange={(e) => setTreeFormData({...treeFormData, duongKinhTan: e.target.value})}
+                    onChange={(e) => setTreeFormData({ ...treeFormData, duongKinhTan: e.target.value })}
                     style={{
                       padding: "7px",
                       backgroundColor: "#0f172a",
@@ -1607,11 +1715,13 @@ function App() {
                   />
                 </div>
               </div>
-              <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{color: "#94a3b8"}}>Trạng thái sức khỏe sinh trưởng:</label>
+
+              {/* TRẠNG THÁI SỨC KHỎE */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Trạng thái sức khỏe sinh trưởng:</label>
                 <select
                   value={treeFormData.tinhTrang}
-                  onChange={(e) => setTreeFormData({...treeFormData, tinhTrang: e.target.value})}
+                  onChange={(e) => setTreeFormData({ ...treeFormData, tinhTrang: e.target.value })}
                   style={{
                     padding: "7px",
                     backgroundColor: "#0f172a",
@@ -1625,16 +1735,18 @@ function App() {
                   <option value="Sâu bệnh">🔴 Sâu bệnh đô thị nguy hiểm</option>
                 </select>
               </div>
-              <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px"}}>
-                <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                  <label style={{color: "#94a3b8"}}>Kinh độ (X - Longitude):</label>
+
+              {/* LƯỚI HAI CỘT: KINH ĐỘ VÀ VĨ ĐỘ FLAT TOẠ ĐỘ THÔ */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ color: "#94a3b8" }}>Kinh độ (X - Longitude):</label>
                   <input
                     type="number"
                     step="0.000001"
                     placeholder="106.7021"
                     required
                     value={treeFormData.lon}
-                    onChange={(e) => setTreeFormData({...treeFormData, lon: e.target.value})}
+                    onChange={(e) => setTreeFormData({ ...treeFormData, lon: e.target.value })}
                     style={{
                       padding: "7px",
                       backgroundColor: "#0f172a",
@@ -1644,15 +1756,15 @@ function App() {
                     }}
                   />
                 </div>
-                <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                  <label style={{color: "#94a3b8"}}>Vĩ độ (Y - Latitude):</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <label style={{ color: "#94a3b8" }}>Vĩ độ (Y - Latitude):</label>
                   <input
                     type="number"
                     step="0.000001"
                     placeholder="10.7725"
                     required
                     value={treeFormData.lat}
-                    onChange={(e) => setTreeFormData({...treeFormData, lat: e.target.value})}
+                    onChange={(e) => setTreeFormData({ ...treeFormData, lat: e.target.value })}
                     style={{
                       padding: "7px",
                       backgroundColor: "#0f172a",
@@ -1663,7 +1775,9 @@ function App() {
                   />
                 </div>
               </div>
-              <div style={{display: "flex", gap: "10px", marginTop: "10px"}}>
+
+              {/* CỤM NÚT ĐIỀU HÀNH FORM */}
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                 <button
                   type="button"
                   onClick={() => setActiveCrudTable(null)}
@@ -1742,18 +1856,18 @@ function App() {
                 paddingBottom: "10px",
               }}
             >
-              <h2 style={{fontSize: "14px", color: "#ef4444", fontWeight: "bold", margin: 0}}>
+              <h2 style={{ fontSize: "14px", color: "#ef4444", fontWeight: "bold", margin: 0 }}>
                 📊 QUẢN LÝ THUỘC TÍNH BẢNG: SU_CO ({suCoList.length} bản ghi)
               </h2>
               <button
                 onClick={() => setShowIncidentListModal(false)}
-                style={{background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontWeight: "bold"}}
+                style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontWeight: "bold" }}
               >
                 ✕ Đóng
               </button>
             </div>
-            <div style={{flex: 1, overflow: "auto"}}>
-              <table style={{width: "100%", borderCollapse: "collapse", fontSize: "12px"}}>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
                 <thead>
                   <tr
                     style={{
@@ -1763,21 +1877,21 @@ function App() {
                       textAlign: "left",
                     }}
                   >
-                    <th style={{padding: "10px"}}>Mã sự cố</th>
-                    <th style={{padding: "10px"}}>Phân loại</th>
-                    <th style={{padding: "10px"}}>Mô tả chi tiết</th>
-                    <th style={{padding: "10px"}}>Trạng thái vận hành</th>
-                    <th style={{padding: "10px", textAlign: "center"}}>Hành động</th>
+                    <th style={{ padding: "10px" }}>Mã sự cố</th>
+                    <th style={{ padding: "10px" }}>Phân loại</th>
+                    <th style={{ padding: "10px" }}>Mô tả chi tiết</th>
+                    <th style={{ padding: "10px" }}>Trạng thái vận hành</th>
+                    <th style={{ padding: "10px", textAlign: "center" }}>Hành động</th>
                   </tr>
                 </thead>
                 <tbody>
                   {suCoList.map((sc) => (
-                    <tr key={sc.id} style={{borderBottom: "1px solid #334155"}}>
-                      <td style={{padding: "10px", color: "#38bdf8"}}>#{sc.id}</td>
-                      <td style={{padding: "10px", fontWeight: "bold"}}>{sc.loai}</td>
-                      <td style={{padding: "10px"}}>{sc.viTri}</td>
-                      <td style={{padding: "10px", color: sc.color}}>● {sc.trangThai}</td>
-                      <td style={{padding: "10px", display: "flex", gap: "6px", justifyContent: "center"}}>
+                    <tr key={sc.id} style={{ borderBottom: "1px solid #334155" }}>
+                      <td style={{ padding: "10px", color: "#38bdf8" }}>#{sc.id}</td>
+                      <td style={{ padding: "10px", fontWeight: "bold" }}>{sc.loai}</td>
+                      <td style={{ padding: "10px" }}>{sc.viTri}</td>
+                      <td style={{ padding: "10px", color: sc.color }}>● {sc.trangThai}</td>
+                      <td style={{ padding: "10px", display: "flex", gap: "6px", justifyContent: "center" }}>
                         <button
                           onClick={() => {
                             handleUpdateStatus(sc.id, sc.trangThai);
@@ -1848,21 +1962,21 @@ function App() {
               color: "#fff",
             }}
           >
-            <h2 style={{fontSize: "14px", color: "#f59e0b", fontWeight: "bold", margin: "0 0 16px 0"}}>
+            <h2 style={{ fontSize: "14px", color: "#f59e0b", fontWeight: "bold", margin: "0 0 16px 0" }}>
               📅 GHI SỔ NHẬT KÝ ĐIỀU HÀNH
             </h2>
             <form
               onSubmit={handleAdminCrudSubmit}
-              style={{display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px"}}
+              style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px" }}
             >
-              <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{color: "#94a3b8"}}>Mã định danh cây xử lý (ID cây):</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Mã định danh cây xử lý (ID cây):</label>
                 <input
                   type="number"
                   required
                   placeholder="Ví dụ: 8, 12, 100..."
                   value={diaryFormData.cayXanhId}
-                  onChange={(e) => setDiaryFormData({...diaryFormData, cayXanhId: e.target.value})}
+                  onChange={(e) => setDiaryFormData({ ...diaryFormData, cayXanhId: e.target.value })}
                   style={{
                     padding: "8px",
                     backgroundColor: "#0f172a",
@@ -1872,11 +1986,11 @@ function App() {
                   }}
                 />
               </div>
-              <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{color: "#94a3b8"}}>Hạng mục công việc công vụ:</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Hạng mục công việc công vụ:</label>
                 <select
                   value={diaryFormData.loaiCongViec}
-                  onChange={(e) => setDiaryFormData({...diaryFormData, loaiCongViec: e.target.value})}
+                  onChange={(e) => setDiaryFormData({ ...diaryFormData, loaiCongViec: e.target.value })}
                   style={{
                     padding: "8px",
                     backgroundColor: "#0f172a",
@@ -1891,13 +2005,13 @@ function App() {
                   <option value="Phun thuốc">🐛 Phun thuốc diệt rầy sinh học</option>
                 </select>
               </div>
-              <div style={{display: "flex", flexDirection: "column", gap: "4px"}}>
-                <label style={{color: "#94a3b8"}}>Ngày thực hiện hiện trường:</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ color: "#94a3b8" }}>Ngày thực hiện hiện trường:</label>
                 <input
                   type="date"
                   required
                   value={diaryFormData.ngayThucHien}
-                  onChange={(e) => setDiaryFormData({...diaryFormData, ngayThucHien: e.target.value})}
+                  onChange={(e) => setDiaryFormData({ ...diaryFormData, ngayThucHien: e.target.value })}
                   style={{
                     padding: "8px",
                     backgroundColor: "#0f172a",
@@ -1907,7 +2021,7 @@ function App() {
                   }}
                 />
               </div>
-              <div style={{display: "flex", gap: "10px", marginTop: "10px"}}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
                 <button
                   type="button"
                   onClick={() => setActiveCrudTable(null)}
@@ -1918,7 +2032,6 @@ function App() {
                     color: "#fff",
                     border: "none",
                     borderRadius: "6px",
-                    cursor: "pointer",
                   }}
                 >
                   Hủy
@@ -1933,7 +2046,6 @@ function App() {
                     border: "none",
                     borderRadius: "6px",
                     fontWeight: "bold",
-                    cursor: "pointer",
                   }}
                 >
                   💾 Ghi nhận sổ sách
@@ -1970,19 +2082,19 @@ function App() {
               color: "#fff",
             }}
           >
-            <h2 style={{fontSize: "14px", color: "#3b82f6", fontWeight: "bold", margin: "0 0 16px 0"}}>
+            <h2 style={{ fontSize: "14px", color: "#3b82f6", fontWeight: "bold", margin: "0 0 16px 0" }}>
               🏢 THÊM ĐƠN VỊ CÔNG TÁC PHỤ TRÁCH
             </h2>
             <form
               onSubmit={handleAdminCrudSubmit}
-              style={{display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px"}}
+              style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "12px" }}
             >
               <input
                 type="text"
                 required
                 placeholder="Tên đơn vị công ty mảng xanh..."
                 value={unitFormData.tenDonVi}
-                onChange={(e) => setUnitFormData({...unitFormData, tenDonVi: e.target.value})}
+                onChange={(e) => setUnitFormData({ ...unitFormData, tenDonVi: e.target.value })}
                 style={{
                   padding: "8px",
                   backgroundColor: "#0f172a",
@@ -1996,7 +2108,7 @@ function App() {
                 required
                 placeholder="Tên kỹ sư đại diện..."
                 value={unitFormData.nguoiDaiDien}
-                onChange={(e) => setUnitFormData({...unitFormData, nguoiDaiDien: e.target.value})}
+                onChange={(e) => setUnitFormData({ ...unitFormData, nguoiDaiDien: e.target.value })}
                 style={{
                   padding: "8px",
                   backgroundColor: "#0f172a",
@@ -2010,7 +2122,7 @@ function App() {
                 required
                 placeholder="Số điện thoại nóng đường dây..."
                 value={unitFormData.soDienThoai}
-                onChange={(e) => setUnitFormData({...unitFormData, soDienThoai: e.target.value})}
+                onChange={(e) => setUnitFormData({ ...unitFormData, soDienThoai: e.target.value })}
                 style={{
                   padding: "8px",
                   backgroundColor: "#0f172a",
@@ -2024,7 +2136,7 @@ function App() {
                 required
                 placeholder="Địa bàn phụ trách (Ví dụ: Phường 5, Q.1)..."
                 value={unitFormData.khuVucPhuTrach}
-                onChange={(e) => setUnitFormData({...unitFormData, khuVucPhuTrach: e.target.value})}
+                onChange={(e) => setUnitFormData({ ...unitFormData, khuVucPhuTrach: e.target.value })}
                 style={{
                   padding: "8px",
                   backgroundColor: "#0f172a",
@@ -2033,7 +2145,7 @@ function App() {
                   borderRadius: "6px",
                 }}
               />
-              <div style={{display: "flex", gap: "10px", marginTop: "8px"}}>
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                 <button
                   type="button"
                   onClick={() => setActiveCrudTable(null)}
@@ -2044,7 +2156,6 @@ function App() {
                     color: "#fff",
                     border: "none",
                     borderRadius: "6px",
-                    cursor: "pointer",
                   }}
                 >
                   Hủy
@@ -2059,7 +2170,6 @@ function App() {
                     border: "none",
                     borderRadius: "6px",
                     fontWeight: "bold",
-                    cursor: "pointer",
                   }}
                 >
                   ⚡ Khởi tạo cấu trúc
@@ -2111,7 +2221,7 @@ function App() {
                 paddingBottom: "12px",
               }}
             >
-              <h2 style={{fontSize: "15px", color: "#10b981", fontWeight: "bold", margin: 0}}>
+              <h2 style={{ fontSize: "15px", color: "#10b981", fontWeight: "bold", margin: 0 }}>
                 📊 DANH SÁCH THUỘC TÍNH QUẦN THỂ CÂY XANH ĐÔ THỊ ({allTrees.length} thực thể Không gian)
               </h2>
               <button
@@ -2130,8 +2240,8 @@ function App() {
                 ✕ Đóng giao diện
               </button>
             </div>
-            <div style={{flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155"}}>
-              <table style={{width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left"}}>
+            <div style={{ flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
                   <tr
                     style={{
@@ -2143,13 +2253,13 @@ function App() {
                       zIndex: 10,
                     }}
                   >
-                    <th style={{padding: "12px"}}>Mã số (ID)</th>
-                    <th style={{padding: "12px"}}>Chủng loại cây</th>
-                    <th style={{padding: "12px"}}>Chiều cao Vạn tuế</th>
-                    <th style={{padding: "12px"}}>Đường kính tán</th>
-                    <th style={{padding: "12px"}}>Trạng thái sinh trưởng</th>
-                    <th style={{padding: "12px"}}>Tọa độ không gian (X, Y)</th>
-                    <th style={{padding: "12px", textAlign: "center"}}>Thao tác dữ liệu</th>
+                    <th style={{ padding: "12px" }}>Mã số (ID)</th>
+                    <th style={{ padding: "12px" }}>Chủng loại cây</th>
+                    <th style={{ padding: "12px" }}>Chiều cao Vạn tuế</th>
+                    <th style={{ padding: "12px" }}>Đường kính tán</th>
+                    <th style={{ padding: "12px" }}>Trạng thái sinh trưởng</th>
+                    <th style={{ padding: "12px" }}>Tọa độ không gian (X, Y)</th>
+                    <th style={{ padding: "12px", textAlign: "center" }}>Thao tác dữ liệu</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2157,19 +2267,19 @@ function App() {
                     <tr>
                       <td
                         colSpan="7"
-                        style={{padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center"}}
+                        style={{ padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center" }}
                       >
                         📭 Không tìm thấy dữ liệu cây xanh nào tương ứng với phân khu này.
                       </td>
                     </tr>
                   ) : (
                     allTrees.map((tree) => (
-                      <tr key={tree.id} style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b"}}>
-                        <td style={{padding: "12px", fontWeight: "bold", color: "#34d399"}}>#{tree.id}</td>
-                        <td style={{padding: "12px", fontWeight: "bold"}}>{tree.loaiCay}</td>
-                        <td style={{padding: "12px"}}>{tree.chieuCao} m</td>
-                        <td style={{padding: "12px"}}>{tree.duongKinhTan} m</td>
-                        <td style={{padding: "12px"}}>
+                      <tr key={tree.id} style={{ borderBottom: "1px solid #334155", backgroundColor: "#1e293b" }}>
+                        <td style={{ padding: "12px", fontWeight: "bold", color: "#34d399" }}>#{tree.id}</td>
+                        <td style={{ padding: "12px", fontWeight: "bold" }}>{tree.loaiCay}</td>
+                        <td style={{ padding: "12px" }}>{tree.chieuCao} m</td>
+                        <td style={{ padding: "12px" }}>{tree.duongKinhTan} m</td>
+                        <td style={{ padding: "12px" }}>
                           <span
                             style={{
                               padding: "4px 8px",
@@ -2193,15 +2303,16 @@ function App() {
                             {tree.tinhTrang}
                           </span>
                         </td>
-                        <td style={{padding: "12px", color: "#38bdf8", fontFamily: "monospace"}}>
+                        <td style={{ padding: "12px", color: "#38bdf8", fontFamily: "monospace" }}>
                           {parseFloat(tree.lon).toFixed(6)}, {parseFloat(tree.lat).toFixed(6)}
                         </td>
-                        <td style={{padding: "12px", display: "flex", gap: "8px", justifyContent: "center"}}>
+                        <td style={{ padding: "12px", display: "flex", gap: "8px", justifyContent: "center" }}>
                           <button
                             onClick={() => {
                               setCrudAction("update");
                               setTreeFormData({
-                                id: tree.id,
+                                MaCayXanh: tree.id,
+                                MaTuyenDuong: tree.maTuyenDuong || "1",
                                 loaiCay: tree.loaiCay,
                                 tinhTrang: tree.tinhTrang,
                                 chieuCao: tree.chieuCao,
@@ -2306,7 +2417,7 @@ function App() {
                 paddingBottom: "12px",
               }}
             >
-              <h2 style={{fontSize: "15px", color: "#38bdf8", fontWeight: "bold", margin: 0}}>
+              <h2 style={{ fontSize: "15px", color: "#38bdf8", fontWeight: "bold", margin: 0 }}>
                 📅 SỔ TÁC NGHIỆP & LỊCH SỬ CHĂM SÓC CÂY ĐÔ THỊ ({allDiaries?.length || 0} lượt ghi chép)
               </h2>
               <button
@@ -2325,8 +2436,8 @@ function App() {
                 ✕ Đóng sổ sách
               </button>
             </div>
-            <div style={{flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155"}}>
-              <table style={{width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left"}}>
+            <div style={{ flex: 1, overflow: "auto", borderRadius: "8px", border: "1px solid #334155" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", textAlign: "left" }}>
                 <thead>
                   <tr
                     style={{
@@ -2338,12 +2449,12 @@ function App() {
                       zIndex: 10,
                     }}
                   >
-                    <th style={{padding: "12px"}}>Mã nhật ký</th>
-                    <th style={{padding: "12px"}}>Liên kết mã thực thể cây</th>
-                    <th style={{padding: "12px"}}>Ngày thực hiện tác vụ</th>
-                    <th style={{padding: "12px"}}>Nội dung công việc</th>
-                    <th style={{padding: "12px"}}>Ghi chú kỹ thuật</th>
-                    <th style={{padding: "12px", textAlign: "center"}}>Quản trị dòng</th>
+                    <th style={{ padding: "12px" }}>Mã nhật ký</th>
+                    <th style={{ padding: "12px" }}>Liên kết mã thực thể cây</th>
+                    <th style={{ padding: "12px" }}>Ngày thực hiện tác vụ</th>
+                    <th style={{ padding: "12px" }}>Nội dung công việc</th>
+                    <th style={{ padding: "12px" }}>Ghi chú kỹ thuật</th>
+                    <th style={{ padding: "12px", textAlign: "center" }}>Quản trị dòng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2351,22 +2462,22 @@ function App() {
                     <tr>
                       <td
                         colSpan="6"
-                        style={{padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center"}}
+                        style={{ padding: "40px", color: "#64748b", fontStyle: "italic", textAlign: "center" }}
                       >
                         📭 Không tìm thấy dữ liệu nhật ký chăm sóc nào.
                       </td>
                     </tr>
                   ) : (
                     allDiaries.map((diary) => (
-                      <tr key={diary.id} style={{borderBottom: "1px solid #334155", backgroundColor: "#1e293b"}}>
-                        <td style={{padding: "12px", fontWeight: "bold", color: "#38bdf8"}}>#{diary.id}</td>
-                        <td style={{padding: "12px", fontWeight: "bold", color: "#34d399"}}>
+                      <tr key={diary.id} style={{ borderBottom: "1px solid #334155", backgroundColor: "#1e293b" }}>
+                        <td style={{ padding: "12px", fontWeight: "bold", color: "#38bdf8" }}>#{diary.id}</td>
+                        <td style={{ padding: "12px", fontWeight: "bold", color: "#34d399" }}>
                           🌲 Cây #{diary.cayXanhId}
                         </td>
-                        <td style={{padding: "12px", fontFamily: "monospace"}}>
+                        <td style={{ padding: "12px", fontFamily: "monospace" }}>
                           {diary.ngayThucHien ? new Date(diary.ngayThucHien).toLocaleDateString("vi-VN") : "---"}
                         </td>
-                        <td style={{padding: "12px"}}>
+                        <td style={{ padding: "12px" }}>
                           <span
                             style={{
                               backgroundColor: "rgba(56, 189, 248, 0.15)",
@@ -2390,10 +2501,10 @@ function App() {
                           }}
                         >
                           {diary.ghiChu || (
-                            <span style={{color: "#475569", fontStyle: "italic"}}>Không có ghi chú</span>
+                            <span style={{ color: "#475569", fontStyle: "italic" }}>Không có ghi chú</span>
                           )}
                         </td>
-                        <td style={{padding: "12px", textAlign: "center"}}>
+                        <td style={{ padding: "12px", textAlign: "center" }}>
                           <button
                             onClick={async () => {
                               if (window.confirm(`⚠️ Xóa dòng nhật ký #${diary.id}?`)) {

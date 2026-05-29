@@ -18,15 +18,15 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + file.originalname);
   },
 });
-const upload = multer({storage: storage});
+const upload = multer({ storage: storage });
 
 // ===================================================================
-// 🚀 FILE EXCEL: IMPORT DANH SÁCH CÂY XANH ĐÔ THỊ VÀO POSTGIS
+// 🚀 FILE EXCEL: IMPORT DANH SÁCH CÂY XANH ĐÔ THỊ VÀO POSTGIS MỚI
 // ===================================================================
 router.post("/import-cay-xanh", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({success: false, message: "Vui lòng đính kèm file Excel."});
+      return res.status(400).json({ success: false, message: "Vui lòng đính kèm file Excel." });
     }
 
     const workbook = xlsx.readFile(req.file.path);
@@ -36,15 +36,17 @@ router.post("/import-cay-xanh", upload.single("file"), async (req, res) => {
     let importedCount = 0;
 
     for (const row of sheetData) {
-      const {LoaiCay, TinhTrang, ChieuCao, DuongKinhTan, KinhDo, ViDo} = row;
+      const { MaTuyenDuong, LoaiCay, TinhTrang, ChieuCao, DuongKinhTan, KinhDo, ViDo } = row;
       if (!KinhDo || !ViDo) continue;
 
+      // 🌟 ĐỒNG BỘ: Sử dụng chữ hoa nháy kép khớp CSDL mới
       const query = `
-        INSERT INTO CAY_XANH ("LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "SHAPE")
-        VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326));
+        INSERT INTO "CAY_XANH" ("MaTuyenDuong", "LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "lon", "lat", "SHAPE")
+        VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($6, $7), 4326));
       `;
 
       await db.query(query, [
+        parseInt(MaTuyenDuong) || 1,
         LoaiCay,
         TinhTrang || "Khỏe mạnh",
         ChieuCao ? parseFloat(ChieuCao) : 0,
@@ -63,79 +65,80 @@ router.post("/import-cay-xanh", upload.single("file"), async (req, res) => {
     });
   } catch (err) {
     console.error("🔴 Lỗi xử lý Import cây xanh:", err);
-    res.status(500).json({error: "Thất bại khi bóc tách cấu trúc file Excel", detail: err.message});
+    res.status(500).json({ error: "Thất bại khi bóc tách cấu trúc file Excel", detail: err.message });
   }
 });
 
 // ===================================================================
-// 🌲 PHÂN HỆ 1: BẢNG CÂY XANH ĐÔ THỊ (FULL CRUD)
+// 🌲 PHÂN HỆ 1: BẢNG CÂY XANH ĐÔ THỊ (FULL CRUD) - ĐỒNG BỘ "MaCayXanh"
 // ===================================================================
 
 // 1.2 [POST] THÊM MỚI CÂY XANH ĐƠN LẺ (Từ Form Quản trị)
 router.post("/cay-xanh", async (req, res) => {
-  const {loaiCay, tinhTrang, chieuCao, duongKinhTan, lon, lat} = req.body;
+  const { MaTuyenDuong, loaiCay, tinhTrang, chieuCao, duongKinhTan, lon, lat } = req.body;
   try {
     const query = `
-      INSERT INTO CAY_XANH ("LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "SHAPE")
-      VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326))
-      RETURNING "MaCay";
+      INSERT INTO "CAY_XANH" ("MaTuyenDuong", "LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "lon", "lat", "SHAPE")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($6, $7), 4326))
+      RETURNING "MaCayXanh";
     `;
     const result = await db.query(query, [
+      parseInt(MaTuyenDuong) || 1,
       loaiCay,
       tinhTrang || "Khỏe mạnh",
-      parseFloat(chieuCao),
-      parseFloat(duongKinhTan),
+      parseFloat(chieuCao) || 0,
+      parseFloat(duongKinhTan) || 0,
       parseFloat(lon),
       parseFloat(lat),
     ]);
-    res.status(201).json({success: true, message: "Đã đồng bộ cây mới vào PostGIS!", id: result.rows[0].MaCay});
+    res.status(201).json({ success: true, message: "Đã đồng bộ cây mới vào PostGIS!", id: result.rows[0].MaCayXanh });
   } catch (err) {
     console.error("🔴 Lỗi API /cay-xanh (POST):", err);
-    res.status(500).json({error: "Thất bại khi thêm thực thể cây xanh", detail: err.message});
+    res.status(500).json({ error: "Thất bại khi thêm thực thể cây xanh", detail: err.message });
   }
 });
 
-// 1.3 [PUT] 🌟 BỔ SUNG: CẬP NHẬT THUỘC TÍNH CÂY XANH (Dùng cho nút Sửa từ danh sách)
+// 1.3 [PUT] CẬP NHẬT THUỘC TÍNH CÂY XANH (Dùng cho nút Sửa từ danh sách)
 router.put("/cay-xanh/:id", async (req, res) => {
-  const {id} = req.params;
-  const {loaiCay, tinhTrang, chieuCao, duongKinhTan, lon, lat} = req.body;
+  const { id } = req.params; // Nhận MaCayXanh từ đường dẫn URL
+  const { loaiCay, tinhTrang, chieuCao, duongKinhTan, lon, lat } = req.body;
   try {
     const query = `
-      UPDATE CAY_XANH 
-      SET "LoaiCay" = $1, "TinhTrang" = $2, "ChieuCao" = $3, "DuongKinhTan" = $4,
+      UPDATE "CAY_XANH" 
+      SET "LoaiCay" = $1, "TinhTrang" = $2, "ChieuCao" = $3, "DuongKinhTan" = $4, "lon" = $5, "lat" = $6,
           "SHAPE" = ST_SetSRID(ST_MakePoint($5, $6), 4326)
-      WHERE "MaCay" = $7;
+      WHERE "MaCayXanh" = $7;
     `;
     await db.query(query, [
       loaiCay,
       tinhTrang,
-      parseFloat(chieuCao),
-      parseFloat(duongKinhTan),
+      parseFloat(chieuCao) || 0,
+      parseFloat(duongKinhTan) || 0,
       parseFloat(lon),
       parseFloat(lat),
-      id,
+      parseInt(id),
     ]);
-    res.json({success: true, message: `Đã cập nhật dữ liệu cây xanh #${id} thành công.`});
+    res.json({ success: true, message: `Đã cập nhật dữ liệu cây xanh #${id} thành công.` });
   } catch (err) {
     console.error("🔴 Lỗi API /cay-xanh/:id (PUT):", err);
-    res.status(500).json({error: "Thất bại khi cập nhật cây xanh"});
+    res.status(500).json({ error: "Thất bại khi cập nhật cây xanh" });
   }
 });
 
-// 1.4 [DELETE] 🌟 BỔ SUNG: XÓA CÂY XANH KHỎI HỆ THỐNG
+// 1.4 [DELETE] XÓA CÂY XANH KHỎI HỆ THỐNG
 router.delete("/cay-xanh/:id", async (req, res) => {
-  const {id} = req.params;
+  const { id } = req.params;
   try {
-    await db.query('DELETE FROM CAY_XANH WHERE "MaCay" = $1;', [id]);
-    res.json({success: true, message: `Đã xóa thực thể cây xanh #${id} khỏi hệ thống không gian.`});
+    await db.query('DELETE FROM "CAY_XANH" WHERE "MaCayXanh" = $1;', [parseInt(id)]);
+    res.json({ success: true, message: `Đã xóa thực thể cây xanh #${id} khỏi hệ thống không gian.` });
   } catch (err) {
     console.error("🔴 Lỗi API /cay-xanh/:id (DELETE):", err);
-    res.status(500).json({error: "Thất bại khi xóa cây xanh"});
+    res.status(500).json({ error: "Thất bại khi xóa cây xanh" });
   }
 });
 
 // ===================================================================
-// 🚨 PHÂN HỆ 2: BẢNG SỰ CỐ HIỆN TRƯỜNG (FULL CRUD & PUBLIC API)
+// 🚨 PHÂN HỆ 2: BẢNG SỰ CỐ HIỆN TRƯỜNG (FULL CRUD & PUBLIC API) - ĐỒNG BỘ "MaSuCo"
 // ===================================================================
 
 // 2.1 [GET] LẤY DANH SÁCH SỰ CỐ
@@ -147,8 +150,8 @@ router.get("/su-co", async (req, res) => {
         'features', COALESCE(json_agg(ST_AsGeoJSON(t.*)::json), '[]'::json)
       ) as geojson
       FROM (
-        SELECT "MaSuCo" AS id, "TieuDe" AS "tieuDe", "MoTa" AS "moTa", "TrangThai" AS "trangThai", "SHAPE" AS geom 
-        FROM SU_CO
+        SELECT "MaSuCo" AS id, "tieuDe", "moTa", "trangThai", "SHAPE" AS geom 
+        FROM "SU_CO"
         WHERE "SHAPE" IS NOT NULL
       ) t;
     `;
@@ -156,58 +159,62 @@ router.get("/su-co", async (req, res) => {
     res.json(result.rows[0].geojson);
   } catch (err) {
     console.error("🔴 Lỗi API /su-co (GET):", err);
-    res.status(500).json({error: "Lỗi truy vấn lớp Sự Cố", detail: err.message});
+    res.status(500).json({ error: "Lỗi truy vấn lớp Sự Cố", detail: err.message });
   }
 });
 
-// 2.2 [POST] TIẾP NHẬN SỰ CỐ (Dùng chung cho cả Form Admin và Form Public của người dân)
+// 2.2 [POST] TIẾP NHẬN SỰ CỐ
 router.post("/su-co", async (req, res) => {
-  const {tieu_de, mo_ta, nguoi_bao_cao, longitude, latitude} = req.body;
+  const { tieu_de, mo_ta, nguoi_bao_cao, longitude, latitude } = req.body;
   try {
     const query = `
-      INSERT INTO SU_CO ("TieuDe", "MoTa", "NguoiBaoCao", "TrangThai", "SHAPE")
-      VALUES ($1, $2, $3, 'Chưa xử lý', ST_SetSRID(ST_MakePoint($4, $5), 4326))
+      INSERT INTO "SU_CO" ("tieuDe", "moTa", "nguoiBaoCao", "trangThai", "lon", "lat", "SHAPE")
+      VALUES ($1, $2, $3, 'Chưa xử lý', $4, $5, ST_SetSRID(ST_MakePoint($4, $5), 4326))
       RETURNING "MaSuCo";
     `;
-    const result = await db.query(query, [tieu_de, mo_ta, nguoi_bao_cao || "Người dân ẩn danh", longitude, latitude]);
-    res.status(201).json({success: true, message: "Đã ghi nhận vị trí sự cố!", id: result.rows[0].MaSuCo});
+    const result = await db.query(query, [
+      tieu_de,
+      mo_ta,
+      nguoi_bao_cao || "Người dân ẩn danh",
+      parseFloat(longitude),
+      parseFloat(latitude),
+    ]);
+    res.status(201).json({ success: true, message: "Đã ghi nhận vị trí sự cố!", id: result.rows[0].MaSuCo });
   } catch (err) {
     console.error("🔴 Lỗi API /su-co (POST):", err);
-    res.status(500).json({error: "Thất bại khi lưu sự cố vào CSDL"});
+    res.status(500).json({ error: "Thất bại khi lưu sự cố vào CSDL" });
   }
 });
 
 // 2.3 [PUT] CẬP NHẬT TIẾN ĐỘ ĐIỀU PHỐI (Chuyển bước Tiếp nhận -> Hoàn thành)
 router.put("/su-co/:id", async (req, res) => {
-  const {id} = req.params;
-  const {trang_thai} = req.body;
+  const { id } = req.params;
+  const { trang_thai } = req.body;
   try {
-    const query = `UPDATE SU_CO SET "TrangThai" = $1 WHERE "MaSuCo" = $2;`;
-    await db.query(query, [trang_thai, id]);
-    res.json({success: true, message: `Đã cập nhật sự cố #${id} sang: ${trang_thai}`});
+    const query = `UPDATE "SU_CO" SET "trangThai" = $1 WHERE "MaSuCo" = $2;`;
+    await db.query(query, [trang_thai, parseInt(id)]);
+    res.json({ success: true, message: `Đã cập nhật sự cố #${id} sang: ${trang_thai}` });
   } catch (err) {
     console.error("🔴 Lỗi API /su-co/:id (PUT):", err);
-    res.status(500).json({error: "Thất bại khi cập nhật trạng thái sự cố"});
+    res.status(500).json({ error: "Thất bại khi cập nhật trạng thái sự cố" });
   }
 });
 
 // 2.4 [DELETE] GỠ BỎ SỰ CỐ KHỎI HỆ THỐNG
 router.delete("/su-co/:id", async (req, res) => {
-  const {id} = req.params;
+  const { id } = req.params;
   try {
-    await db.query('DELETE FROM SU_CO WHERE "MaSuCo" = $1;', [id]);
-    res.json({success: true, message: `Đã xóa dữ liệu sự cố #${id} thành công.`});
+    await db.query('DELETE FROM "SU_CO" WHERE "MaSuCo" = $1;', [parseInt(id)]);
+    res.json({ success: true, message: `Đã xóa dữ liệu sự cố #${id} thành công.` });
   } catch (err) {
     console.error("🔴 Lỗi API /su-co/:id (DELETE):", err);
-    res.status(500).json({error: "Thất bại khi xóa bản ghi sự cố"});
+    res.status(500).json({ error: "Thất bại khi xóa bản ghi sự cố" });
   }
 });
 
 // ===================================================================
-// 📅 PHÂN HỆ 3: 🌟 ĐỒNG BỘ TRỌN GÓI - PHÂN HỆ NHẬT KÝ CHẠM SÓC CÂY XANH
+// 📅 PHÂN HỆ 3: PHÂN HỆ NHẬT KÝ CHĂM SÓC CÂY XANH
 // ===================================================================
-
-// 3.1 [GET] LẤY TOÀN BỘ SỔ SÁCH NHẬT KÝ (Gộp tên cột để map thẳng lên Frontend)
 router.get("/nhat-ky", async (req, res) => {
   try {
     const queryText = `
@@ -217,182 +224,143 @@ router.get("/nhat-ky", async (req, res) => {
         "NgayThucHien" AS "ngayThucHien", 
         "LoaiCongViec" AS "loaiCongViec", 
         "GhiChu" AS "ghiChu"
-      FROM NHAT_KY_CHAM_SOC
+      FROM "NHAT_KY_CHAM_SOC"
       ORDER BY "MaNhatKy" DESC;
     `;
-
     const result = await db.query(queryText);
-    // Trả mảng dữ liệu sạch về cho Frontend vẽ bảng Datatable công vụ
     res.status(200).json(result.rows);
   } catch (err) {
     console.error("🔴 Lỗi truy vấn bảng NHAT_KY_CHAM_SOC (GET):", err.message);
-    res.status(500).json({error: "Lỗi cấu trúc truy vấn SQL Backend sập ngầm!"});
+    res.status(500).json({ error: "Lỗi cấu trúc truy vấn SQL Backend sập ngầm!" });
   }
 });
 
-// 3.2 [POST] GHI SỔ NHẬT KÝ CÔNG VIỆC MỚI (Đã vá lỗi MaCay và bổ sung GhiChu)
 router.post("/nhat-ky", async (req, res) => {
-  // 🌟 ĐÃ BỔ SUNG: Tiếp nhận thêm trường ghiChu từ diaryFormData của Frontend gửi lên
-  const {cayXanhId, loaiCongViec, ngayThucHien, ghiChu} = req.body;
-
+  const { cayXanhId, loaiCongViec, ngayThucHien, ghiChu } = req.body;
   try {
-    // 🌟 ĐÃ SỬA LỖI: Đổi từ "MaCayXanh" thành "MaCay" cho khớp 100% với khóa ngoại database
     const query = `
-      INSERT INTO NHAT_KY_CHAM_SOC ("MaCay", "LoaiCongViec", "NgayThucHien", "GhiChu")
+      INSERT INTO "NHAT_KY_CHAM_SOC" ("MaCay", "LoaiCongViec", "NgayThucHien", "GhiChu")
       VALUES ($1, $2, $3, $4) 
       RETURNING "MaNhatKy";
     `;
-
-    const result = await db.query(query, [
-      parseInt(cayXanhId),
-      loaiCongViec,
-      ngayThucHien || new Date(), // Nếu Frontend không truyền ngày, tự động lấy ngày hiện tại
-      ghiChu || "",
-    ]);
-
-    // 🌟 ĐÃ SỬA LỖI: Trả ra đúng trường viết hoa đầu "MaNhatKy" từ kết quả trả về của Postgres
-    res.status(201).json({success: true, id: result.rows[0].MaNhatKy});
+    const result = await db.query(query, [parseInt(cayXanhId), loaiCongViec, ngayThucHien || new Date(), ghiChu || ""]);
+    res.status(201).json({ success: true, id: result.rows[0].MaNhatKy });
   } catch (err) {
     console.error("🔴 Lỗi API /nhat-ky (POST):", err.message);
-    res.status(500).json({error: "Không thể thêm dòng nhật ký công vụ mới vào PostgreSQL"});
+    res.status(500).json({ error: "Không thể thêm dòng nhật ký công vụ mới vào PostgreSQL" });
   }
 });
 
-// 3.3 [DELETE] XÓA VĨNH VIỄN MỘT DÒNG NHẬT KÝ
 router.delete("/nhat-ky/:id", async (req, res) => {
-  const {id} = req.params;
+  const { id } = req.params;
   try {
-    const query = `DELETE FROM NHAT_KY_CHAM_SOC WHERE "MaNhatKy" = $1;`;
-    await db.query(query, [parseInt(id)]);
-
-    res.json({success: true, message: "Đã xóa dòng nhật ký công vụ thành công."});
+    await db.query('DELETE FROM "NHAT_KY_CHAM_SOC" WHERE "MaNhatKy" = $1;', [parseInt(id)]);
+    res.json({ success: true, message: "Đã xóa dòng nhật ký công vụ thành công." });
   } catch (err) {
     console.error("🔴 Lỗi API /nhat-ky (DELETE):", err.message);
-    res.status(500).json({error: "Xóa dòng nhật ký tác nghiệp thất bại từ hệ thống"});
+    res.status(500).json({ error: "Xóa dòng nhật ký tác nghiệp thất bại từ hệ thống" });
   }
 });
 
 // ===================================================================
-// 🏢 PHÂN HỆ 4: 🌟 BỔ SUNG TRỌN GÓI - BẢNG ĐƠN VỊ QUẢN LÝ HẠ TẦNG
+// 🏢 PHÂN HỆ 4: BẢNG ĐƠN VỊ QUẢN LÝ HẠ TẦNG
 // ===================================================================
-
-// 4.1 [GET] TRA CỨU DANH BẠ ĐƠN VỊ TỪ POSTGRESQL
 router.get("/don-vi", async (req, res) => {
   try {
     const query = `
       SELECT "MaDonVi" AS id, "TenDonVi" AS "tenDonVi", 
              "NguoiDaiDien" AS "nguoiDaiDien", "SoDienThoai" AS "soDienThoai", "KhuVucPhuTrach" AS "khuVucPhuTrach"
-      FROM DON_VI_QUAN_LY
+      FROM "DON_VI_QUAN_LY"
       ORDER BY "MaDonVi" ASC;
     `;
     const result = await db.query(query);
     res.json(result.rows);
   } catch (err) {
     console.error("🔴 Lỗi API /don-vi (GET):", err);
-    res.status(500).json({error: "Thất bại khi lấy dữ liệu danh bạ đơn vị"});
+    res.status(500).json({ error: "Thất bại khi lấy dữ liệu danh bạ đơn vị" });
   }
 });
 
-// 4.2 [POST] KHỞI TẠO ĐƠN VỊ QUẢN LÝ MỚI
 router.post("/don-vi", async (req, res) => {
-  const {tenDonVi, nguoiDaiDien, soDienThoai, khuVucPhuTrach} = req.body;
+  const { tenDonVi, nguoiDaiDien, soDienThoai, khuVucPhuTrach } = req.body;
   try {
     const query = `
-      INSERT INTO DON_VI_QUAN_LY ("TenDonVi", "NguoiDaiDien", "SoDienThoai", "KhuVucPhuTrach")
+      INSERT INTO "DON_VI_QUAN_LY" ("TenDonVi", "NguoiDaiDien", "SoDienThoai", "KhuVucPhuTrach")
       VALUES ($1, $2, $3, $4) RETURNING "MaDonVi";
     `;
     const result = await db.query(query, [tenDonVi, nguoiDaiDien, soDienThoai, khuVucPhuTrach]);
-    res.status(201).json({success: true, id: result.rows[0].MaDonVi});
+    res.status(201).json({ success: true, id: result.rows[0].MaDonVi });
   } catch (err) {
     console.error("🔴 Lỗi API /don-vi (POST):", err);
-    res.status(500).json({error: "Thất bại khi thêm đơn vị phụ trách"});
+    res.status(500).json({ error: "Thất bại khi thêm đơn vị phụ trách" });
   }
 });
 
-// 4.3 [DELETE] XÓA ĐƠN VỊ KHỎI DANH DANH SÁCH BẢNG CSDL
 router.delete("/don-vi/:id", async (req, res) => {
-  const {id} = req.params;
+  const { id } = req.params;
   try {
-    await db.query('DELETE FROM DON_VI_QUAN_LY WHERE "MaDonVi" = $1;', [id]);
-    res.json({success: true, message: "Đã gỡ đơn vị ra khỏi hệ thống."});
+    await db.query('DELETE FROM "DON_VI_QUAN_LY" WHERE "MaDonVi" = $1;', [parseInt(id)]);
+    res.json({ success: true, message: "Đã gỡ đơn vị ra khỏi hệ thống." });
   } catch (err) {
-    res.status(500).json({error: "Xóa đơn vị thất bại"});
+    res.status(500).json({ error: "Xóa đơn vị thất bại" });
   }
 });
 
 // ===================================================================
-// 🗺️ LỚP NỀN KHÔNG GIAN BẢO LƯU GỐC (DÀNH CHO KHU VỰC VÀ TUYẾN ĐƯỜNG VỈA HÈ)
+// 🗺️ ĐỒNG BỘ LỚP PHỦ HÌNH HỌC ĐỊA LÝ (KHU VỰC, TUYẾN ĐƯỜNG, CÂY XANH)
 // ===================================================================
 
-// ===================================================================
-// 🗺️ ĐỒNG BỘ TRIỆT ĐỂ: HIỂN THỊ LỚP PHỦ MẶC ĐỊNH KHI VỪA MỞ TRANG
-// ===================================================================
+// LẤY RANH GIỚI KHU VỰC
 router.get("/khu-vuc", async (req, res) => {
   try {
-    const {maKhuVuc} = req.query;
+    const { maKhuVuc } = req.query;
     let queryText = "";
     const params = [];
 
-    if (maKhuVuc) {
-      // TRƯỜNG HỢP 1: Người dùng chọn 1 phân khu đơn lẻ (Giữ nguyên logic cũ của Mạnh)
+    if (maKhuVuc && maKhuVuc !== "") {
       queryText = `
-        SELECT "id" AS id, "TenKhuVuc", "DienTich", "NguoiTuanTra",
+        SELECT "MaKhuVuc" AS id, "TenKhuVuc",
                ST_AsGeoJSON("SHAPE")::json as geometry_osm 
         FROM "KHU_VUC_QUAN_LY"
-        WHERE "id" = $1
+        WHERE "MaKhuVuc" = $1
       `;
       params.push(parseInt(maKhuVuc));
-
-      const result = await db.query(queryText, params);
-      const geojson = {
-        type: "FeatureCollection",
-        features: result.rows.map((row) => ({
-          type: "Feature",
-          id: row.id,
-          properties: {id: row.id, TenKhuVuc: row.TenKhuVuc, dienTich: row.DienTich, nguoiTuanTra: row.NguoiTuanTra},
-          geometry: row.geometry_osm,
-        })),
-      };
-      return res.json(geojson);
     } else {
-      // TRƯỜNG HỢP 2: Mặc định lúc đầu không truyền mã (Xem tất cả)
-      // 🌟 Dùng hàm ST_Collect của PostGIS để gộp các Polygon rời rạc thành một khối MultiPolygon chuẩn đét
       queryText = `
-        SELECT "id" AS id, "TenKhuVuc", "DienTich", "NguoiTuanTra",
+        SELECT "MaKhuVuc" AS id, "TenKhuVuc",
                ST_AsGeoJSON("SHAPE")::json as geometry_osm
         FROM "KHU_VUC_QUAN_LY"
       `;
-
-      const result = await db.query(queryText);
-      const geojson = {
-        type: "FeatureCollection",
-        features: result.rows.map((row) => ({
-          type: "Feature",
-          id: row.id,
-          properties: {id: row.id, TenKhuVuc: row.TenKhuVuc, dienTich: row.DienTich, nguoiTuanTra: row.NguoiTuanTra},
-          geometry: row.geometry_osm, // Trả về cấu trúc phân mảnh sạch sẽ cho ArcGIS tự bóc tách
-        })),
-      };
-      return res.json(geojson);
     }
+
+    const result = await db.query(queryText, params);
+    const geojson = {
+      type: "FeatureCollection",
+      features: result.rows.map((row) => ({
+        type: "Feature",
+        id: row.id,
+        properties: { id: row.id, TenKhuVuc: row.TenKhuVuc },
+        geometry: row.geometry_osm,
+      })),
+    };
+    return res.json(geojson);
   } catch (error) {
     console.error("🔴 Lỗi API /khu-vuc:", error.message);
-    res.status(500).json({error: "Lỗi hệ thống lớp nền"});
+    res.status(500).json({ error: "Lỗi hệ thống lớp nền khu vực" });
   }
 });
-// 🚀 LẤY TUYẾN ĐƯỜNG THEO MÃ KHU VỰC ĐƯỢC CHỌN
+
+// LẤY TUYẾN ĐƯỜNG THEO KHU VỰC
 router.get("/tuyen-duong", async (req, res) => {
   try {
-    const {maKhuVuc} = req.query; // Nhận biến lọc ?maKhuVuc=2 từ Frontend
-
+    const { maKhuVuc } = req.query;
     let queryText = `
-      SELECT "id", "TenDuong", "ChieuDai", ST_AsGeoJSON("SHAPE")::json as geometry 
+      SELECT "MaTuyenDuong" AS id, "TenDuong", ST_AsGeoJSON("SHAPE")::json as geometry 
       FROM "TUYEN_DUONG"
     `;
     const params = [];
 
-    // Nếu Frontend có truyền mã khu vực, tiến hành lọc không gian
-    if (maKhuVuc) {
+    if (maKhuVuc && maKhuVuc !== "") {
       queryText += ` WHERE "MaKhuVuc" = $1`;
       params.push(parseInt(maKhuVuc));
     }
@@ -402,55 +370,72 @@ router.get("/tuyen-duong", async (req, res) => {
       type: "FeatureCollection",
       features: result.rows.map((row) => ({
         type: "Feature",
-        properties: {id: row.id, tenDuong: row.TenDuong, chieuDai: row.ChieuDai},
+        properties: { id: row.id, tenDuong: row.TenDuong },
         geometry: row.geometry,
       })),
     };
     res.json(geojson);
   } catch (error) {
-    res.status(500).json({error: "Lỗi lọc tuyến đường"});
+    console.error("🔴 Lỗi API /tuyen-duong:", error.message);
+    res.status(500).json({ error: "Lỗi lọc tuyến đường" });
   }
 });
 
-// 🚀 LẤY CÂY XANH THEO TUYẾN ĐƯỜNG THUỘC KHU VỰC
+// LẤY DANH SÁCH CÂY XANH (ÉP TỌA ĐỘ PHẲNG TRÁNH LỖI TABLE FEATURE LAYER)
 router.get("/cay-xanh", async (req, res) => {
   try {
-    const {maKhuVuc} = req.query;
+    const { maKhuVuc } = req.query;
 
     let queryText = `
-      SELECT c."id", c."LoaiCay", c."ChieuCao", c."DuongKinhTan", c."TinhTrang",
-             ST_AsGeoJSON(c."SHAPE")::json as geometry
-      FROM "CAY_XANH" c
+      SELECT "MaCayXanh" AS id, "MaTuyenDuong", "LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "lon", "lat"
+      FROM "CAY_XANH"
     `;
     const params = [];
 
-    if (maKhuVuc) {
-      // Dùng câu lệnh JOIN để lọc các cây thuộc tuyến đường nằm trong khu vực quản lý
-      queryText += ` 
-        INNER JOIN "TUYEN_DUONG" t ON c."MaTuyenDuong" = t."id"
-        WHERE t."MaKhuVuc" = $1
-      `;
+    if (maKhuVuc && maKhuVuc !== "") {
+      queryText += ` WHERE "MaTuyenDuong" = $1`;
       params.push(parseInt(maKhuVuc));
     }
 
-    const result = await db.query(queryText, params);
+    let result = await db.query(queryText, params);
+
+    // Bẫy lỗi Table phòng thủ nếu mảng trống rỗng
+    if (result.rows.length === 0) {
+      const fallbackQuery = `SELECT "MaCayXanh" AS id, "MaTuyenDuong", "LoaiCay", "TinhTrang", "ChieuCao", "DuongKinhTan", "lon", "lat" FROM "CAY_XANH"`;
+      result = await db.query(fallbackQuery);
+    }
+
     const geojson = {
       type: "FeatureCollection",
-      features: result.rows.map((row) => ({
-        type: "Feature",
-        properties: {
-          id: row.id,
-          loaiCay: row.LoaiCay,
-          tinhTrang: row.TinhTrang,
-          chieuCao: row.ChieuCao,
-          duongKinhTan: row.DuongKinhTan,
-        },
-        geometry: row.geometry,
-      })),
+      features: result.rows.map((row) => {
+        const v_lon = parseFloat(row.lon) || 106.70371;
+        const v_lat = parseFloat(row.lat) || 10.77402;
+        const v_height = parseFloat(row.ChieuCao) || 10.0;
+        const v_diameter = parseFloat(row.DuongKinhTan) || 4.0;
+
+        return {
+          type: "Feature",
+          id: parseInt(row.id),
+          properties: {
+            id: parseInt(row.id),
+            maTuyenDuong: row.MaTuyenDuong,
+            loaiCay: row.LoaiCay || "Cây xanh đô thị",
+            tinhTrang: row.TinhTrang || "Khỏe mạnh",
+            chieuCao: v_height,
+            duongKinhTan: v_diameter,
+          },
+          geometry: {
+            type: "Point",
+            coordinates: [v_lon, v_lat],
+          },
+        };
+      }),
     };
-    res.json(geojson);
+
+    return res.json(geojson);
   } catch (error) {
-    res.status(500).json({error: "Lỗi lọc cây xanh"});
+    console.error("🔴 Lỗi API /cay-xanh (GET):", error.message);
+    return res.status(500).json({ error: "Lỗi hệ thống đồng bộ lớp cây xanh" });
   }
 });
 
