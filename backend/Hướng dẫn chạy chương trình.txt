@@ -1,0 +1,86 @@
+===================================================================
+🛰️ HƯỚNG DẪN CÀI ĐẶT VÀ KHỞI CHẠY TOÀN DIỆN DỰ ÁN GIS 3D
+🎯 ĐỀ TÀI: HỆ THỐNG QUẢN LÝ CÂY XANH ĐÔ THỊ TPHCM (FULL-STACK)
+===================================================================
+
+Dự án gồm 2 phần chính chạy song song:
+1. Backend: API Node.js (Express) + Cơ sở dữ liệu PostGIS (PostgreSQL).
+2. Frontend: Ứng dụng ReactJS (Vite) + Giao diện bản đồ ArcGIS Maps SDK.
+
+-------------------------------------------------------------------
+🛠️ PHẦN 1: YÊU CẦU PHẦN MỀM CẦN CÀI ĐẶT TRÊN MÁY (PREREQUISITES)
+-------------------------------------------------------------------
+Trước khi chạy code, đảm bảo máy tính cá nhân đã cài sẵn:
+1. Node.js (Phiên bản v16.x trở lên)
+2. PostgreSQL (Phiên bản 13 trở lên) + Công cụ quản lý pgAdmin 4
+3. Bộ cài đặt tích hợp PostGIS Extension (Lúc cài Postgres nhớ tích chọn)
+
+-------------------------------------------------------------------
+🚀 PHẦN 2: QUY TRÌNH SETUP VÀ KHỞI CHẠY TỪ CON SỐ 0
+-------------------------------------------------------------------
+
+👉 BƯỚC 1: KHỞI TẠO CƠ SỞ DỮ LIỆU KHÔNG GIAN TRÊN PGADMIN
+1. Mở phần mềm pgAdmin 4 lên và đăng nhập.
+2. Nhấp chuột phải vào mục "Databases" -> Chọn "Create" -> "Database...".
+3. Đặt tên Database chính xác là: gis_3d_cay_xanh
+4. Sau khi tạo xong, nhấp chuột phải vào tên Database `gis_3d_cay_xanh` -> Chọn "Query Tool".
+5. Gõ câu lệnh SQL sau đây để kích hoạt tính năng xử lý bản đồ không gian:
+   CREATE EXTENSION postgis;
+6. Nhấn nút Play (hoặc phím F5) để thực thi. Màn hình báo thành công là đạt.
+
+👉 BƯỚC 2: KHỞI CHẠY HỆ THỐNG BACKEND (SERVER)
+1. Mở Terminal trên VS Code và di chuyển vào thư mục backend:
+   cd backend
+2. Cài đặt các thư viện liên quan của Backend:
+   npm install
+3. Chạy file cấu hình khởi tạo khung xương bảng ban đầu:
+   node initDb.js
+4. Kích hoạt Server Backend chạy chính thức:
+   node server.js
+* Màn hình thông báo Server đang lắng nghe thành công tại cổng mặc định (ví dụ: http://localhost:5000). Giữ nguyên Terminal này không được tắt.
+
+👉 BƯỚC 3: NẠP DỮ LIỆU TĨNH ĐỒNG BỘ (OFFLINE 100%)
+Vì mạng quốc tế dễ nghẽn, nhóm đã backup sẵn dữ liệu ranh giới Phường/Xã và Tuyến đường thực tế của TPHCM vào file `.sql`. Các thành viên KHÔNG CẦN chạy lại script Python.
+Thao tác nạp dữ liệu:
+1. Vào pgAdmin, nhấp chuột phải vào Database `gis_3d_cay_xanh` -> Chọn "Query Tool".
+2. Nhấn tổ hợp phím Ctrl + O, tìm và mở file: backend/data_backup.sql
+3. Nhấn nút Play (hoặc phím F5) để thực thi nạp hàng nghìn tọa độ đường/vùng vào DB trong 2 giây.
+
+👉 BƯỚC 4: KHỞI CHẠY HỆ THỐNG FRONTEND (GIAO DIỆN BẢN ĐỒ 3D)
+1. Mở một cửa sổ Terminal MỚI hoàn toàn trên VS Code (Nhấn nút dấu cộng '+' ở góc khu vực Terminal).
+2. Di chuyển Terminal vào thư mục frontend của dự án:
+   cd frontend
+3. Cài đặt các thư viện giao diện và lõi bản đồ ArcGIS SDK:
+   npm install
+4. Kích hoạt môi trường chạy Frontend bằng Vite:
+   npm run dev
+5. Terminal Frontend sẽ cấp cho bạn một đường link local (thường là http://localhost:5173). 
+* Giữ phím Ctrl và click chuột vào đường link đó để mở giao diện Web-GIS 3D trên trình duyệt web.
+
+-------------------------------------------------------------------
+🗂️ PHẦN 3: SƠ ĐỒ CẤU TRÚC THƯ MỤC CỐT LÕI DỰ ÁN
+-------------------------------------------------------------------
+do-an-uit-quan-ly-cay-xanh-gis-3d/
+├── backend/
+│   ├── data_backup.sql               # File sao lưu dữ liệu Phường/Xã & Tuyến đường từ pgAdmin
+│   ├── initDb.js                     # File Node.js quản lý khởi tạo khung xương DB
+│   └── server.js                     # Điểm khởi chạy luồng API chính Backend
+├── frontend/
+│   ├── src/                          # Mã nguồn cấu trúc thư mục ReactJS
+│   │   ├── components/               # Nơi chứa các component bản đồ, thanh menu điều khiển
+│   │   └── App.jsx                   # Component gốc tích hợp SceneView 3D ArcGIS
+│   ├── package.json                  # Định nghĩa các thư viện Frontend (Vite, ArcGIS Maps SDK)
+│   └── vite.config.js                # File cấu hình đóng gói ứng dụng của Vite
+├── .gitignore                        # Cấu hình Git chặn các file nhị phân rác (>100MB)
+└── HUONG_DAN_CHAY_DU_AN.txt          # File hướng dẫn này
+
+-------------------------------------------------------------------
+⚠️ PHẦN 4: NGUYÊN TẮC PHÁT TRIỂN NHÓM VÀ QUẢN LÝ GIT
+-------------------------------------------------------------------
+1. Luôn mở đồng thời 2 cửa sổ Terminal độc lập khi làm việc: Một cái chạy Backend (`node server.js`), một cái chạy Frontend (`npm run dev`).
+2. Tuyệt đối không tự ý commit các file dữ liệu bản đồ nhị phân gốc (.shp, .dbf) vượt quá 100MB lên GitHub.
+3. Khi phát triển thêm tính năng hoặc thêm dữ liệu cây xanh mới, hãy cập nhật cấu hình API tương ứng ở cả hai thư mục và export dữ liệu mẫu mới dưới dạng file text `.sql` để chia sẻ cho nhóm.
+
+===================================================================
+Chúc nhóm phối hợp phát triển tốt và hoàn thành xuất sắc đồ án UIT!
+===================================================================
