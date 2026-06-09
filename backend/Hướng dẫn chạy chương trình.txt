@@ -36,7 +36,7 @@ Trước khi chạy code, đảm bảo máy tính cá nhân đã cài sẵn:
 3. Chạy file cấu hình khởi tạo khung xương bảng ban đầu:
    node initDb.js
 4. Kích hoạt Server Backend chạy chính thức:
-   node server.js
+   npm run dev hoặc npm run start
 * Màn hình thông báo Server đang lắng nghe thành công tại cổng mặc định (ví dụ: http://localhost:5000). Giữ nguyên Terminal này không được tắt.
 
 👉 BƯỚC 3: NẠP DỮ LIỆU TĨNH ĐỒNG BỘ (OFFLINE 100%)
